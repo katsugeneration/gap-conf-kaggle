@@ -1,8 +1,8 @@
 import pandas
-import load_data
 
-def evaluate():
-    df = load_data.load('dataset/gap-development.tsv')
+
+def evaluate(test_data):
+    df = pandas.read_csv('dataset/gap-development.tsv', sep='\t')
     she_list = ['her', 'She', 'she', 'Her', 'hers', 'Hers']
     he_list = ['him', 'He', 'he', 'Him', 'His', 'his']
 

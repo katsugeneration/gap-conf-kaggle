@@ -1,5 +1,6 @@
 import importlib
 import argparse
+import load_data
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -17,5 +18,6 @@ parser.add_argument(
 args = parser.parse_args()
 
 model = importlib.import_module('models.' + args.model)
-evals = model.evaluate()
+df = load_data.load('dataset/gap-development.tsv')
+evals = model.evaluate(df)
 evals.to_csv(args.output_path, columns=['ID', 'A', 'B', 'NEITHER'], header=True, index=False)
