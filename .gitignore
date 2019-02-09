@@ -102,3 +102,9 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+# origin setteings
+.vscode/
+kaggle-data/
+*test.csv
+TODO
