@@ -30,5 +30,7 @@ def evaluate(test_data):
               (test_data['B'][test_data['Pronoun'].isin(he_list)].isin(he_only)))
     evals.loc[A_true, 'A'] = 1.0
     evals.loc[B_true, 'B'] = 1.0
-    evals.loc[~(A_true | B_true), 'NEITHER'] = 1.0
+    evals.loc[~(A_true | B_true), 'A'] = 0.33333
+    evals.loc[~(A_true | B_true), 'B'] = 0.33333
+    evals.loc[~(A_true | B_true), 'NEITHER'] = 0.33333
     return evals
