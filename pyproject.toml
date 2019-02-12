@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "gap-conf-kaggle"
+version = "0.1.0"
+description = ""
+authors = ["Katsuya SHIMABUKURO <katsu.generation.888@gmail.com>"]
+
+[tool.poetry.dependencies]
+python = "3.6.8"
+numpy = "^1.16"
+scipy = "^1.2"
+pandas = "^0.24.1"
+stanfordnlp = "^0.1.1"
+scikit-learn = "^0.20.2"
+
+[tool.poetry.dev-dependencies]
+nose = "^1.3"
+tox = "^3.7"
+
+[build-system]
+requires = ["poetry>=0.12"]
+build-backend = "poetry.masonry.api"
