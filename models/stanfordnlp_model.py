@@ -1,8 +1,10 @@
 import pandas
 import utils
+import pickle
 from collections import namedtuple
 import numpy as np
-from sklearn.decomposition import PCA
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
 from sklearn.feature_extraction.text import CountVectorizer
 
 
@@ -64,17 +66,37 @@ def _get_classify_labels(df):
     return labels
 
 
+def train(use_preprocessdata=False):
+    if use_preprocessdata:
+        try:
+            with open('preprocesseddata.pkl', 'rb') as f:
+                X, Y = pickle.load(f)
+        except:  # noqa
+            use_preprocessdata = False
+
+    if not use_preprocessdata:
+        df = pandas.read_csv('dataset/gap-development.tsv', sep='\t')
+        X = []
+        Y = _get_classify_labels(df)
+        print(Y[0])
+        for i in range(len(df)):
+            words, pronnoun_index = utils.charpos_to_word_index(df['Text'][i], df['Pronoun-offset'][i])
+            _, A_index = utils.charpos_to_word_index(df['Text'][i], df['A-offset'][i], words=words)
+            _, B_index = utils.charpos_to_word_index(df['Text'][i], df['B-offset'][i], words=words)
+            X.append(_vectorise_bag_of_pos(words, [pronnoun_index, A_index, B_index], 5))
+        print(X[0])
+
+        with open('preprocesseddata.pkl', 'wb') as f:
+            pickle.dump((X, Y), f, protocol=pickle.HIGHEST_PROTOCOL)
+    lr = LogisticRegression(random_state=0)
+    lr.fit(X, Y)
+    with open('model.pkl', 'wb') as f:
+        pickle.dump(lr, f, protocol=pickle.HIGHEST_PROTOCOL)
+    y_pred = lr.predict(X)
+    print(accuracy_score(Y, y_pred))
+
+
 def evaluate(test_data):
-    df = pandas.read_csv('dataset/gap-development.tsv', sep='\t')
+    pass
 
-    X = []
-    for i in range(10):
-        words, pronnoun_index = utils.charpos_to_word_index(df['Text'][i], df['Pronoun-offset'][i])
-        words, A_index = utils.charpos_to_word_index(df['Text'][i], df['A-offset'][i])
-        words, B_index = utils.charpos_to_word_index(df['Text'][i], df['B-offset'][i])
-        X.append(_vectorise_bag_of_pos(words, [pronnoun_index, A_index, B_index], 5))
-    print(X)
-    print(PCA(n_components=2).fit_transform(X))
-
-
-evaluate('')
+train(use_preprocessdata=True)
