@@ -4,6 +4,8 @@ import pickle
 from collections import namedtuple
 import numpy as np
 from sklearn.linear_model import LogisticRegression
+from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.feature_extraction.text import CountVectorizer
 
@@ -99,11 +101,13 @@ def train(use_preprocessdata=False):
 
         with open('preprocess_traindata.pkl', 'wb') as f:
             pickle.dump((X, Y), f, protocol=pickle.HIGHEST_PROTOCOL)
-    lr = LogisticRegression(random_state=0)
-    lr.fit(X, Y)
+    model = LogisticRegression(random_state=0)
+    # model = SVC(C=10, probability=True, random_state=0)
+    # model = MLPClassifier(hidden_layer_sizes=(50, 30, 30, 50), activation='relu', solver='adam', batch_size=128, random_state=0)
+    model.fit(X, Y)
     with open('model.pkl', 'wb') as f:
-        pickle.dump(lr, f, protocol=pickle.HIGHEST_PROTOCOL)
-    y_pred = lr.predict(X)
+        pickle.dump(model, f, protocol=pickle.HIGHEST_PROTOCOL)
+    y_pred = model.predict(X)
     print("Train Accuracy:", accuracy_score(Y, y_pred))
 
 
