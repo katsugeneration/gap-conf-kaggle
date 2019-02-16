@@ -51,6 +51,26 @@ def _vectorise_bag_of_pos(words, indexes, N):
     return cv.transform(matrixes).toarray().flatten()
 
 
+def _get_bag_of_pos_ngram(words, index, window_size, N):
+    """Return pos list surrounding index
+    Args:
+        words (list): stanfordnlp word list object having pos attributes.
+        index (int): target index
+        window_size (int): target window size return +/- N word pos n-grma
+        N (int): n-gram set
+    Return:
+        pos_list (List[str]): xpo format string list
+    """
+    DummyWord = namedtuple("DummyWord", "pos")
+    sos = DummyWord(pos=START_OF_SENTENCE)
+    eos = DummyWord(pos=END_OF_SENTENCE)
+    words = [sos] * (window_size + N) + words + [eos] * (window_size + N)
+    index += (window_size + N)
+    return [
+        "-".join([w.pos for w in words[i:i+N]])
+        for i in range(index-window_size, index+window_size+1)]
+
+
 def _get_classify_labels(df):
     """Return task classify label
 
@@ -129,4 +149,4 @@ def evaluate(test_data, use_preprocessdata=True):
     return out_df
 
 
-train()
+# train()

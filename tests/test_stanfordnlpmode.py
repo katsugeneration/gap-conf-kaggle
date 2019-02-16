@@ -33,3 +33,13 @@ def test_get_classify_labels():
     data = pandas.DataFrame(data=[[True, False], [False, True], [False, False]], columns=['A-coref', 'B-coref'])
     labels = stanfordnlp_model._get_classify_labels(data)
     np.testing.assert_array_equal([[0], [1], [2]], labels)
+
+
+
+def test_get_bag_of_pos_ngram():
+    words, index = utils.charpos_to_word_index(
+            "Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
+            274)
+    poss = stanfordnlp_model._get_bag_of_pos_ngram(words, index, 5, 2)
+    eq_(11, len(poss))
+    eq_([words[i].pos + "-" + words[i+1].pos for i in range(index-5, index+6)], poss)
