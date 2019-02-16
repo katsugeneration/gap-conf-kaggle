@@ -2,6 +2,7 @@ import pandas
 import utils
 import pickle
 from collections import namedtuple
+import itertools
 import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
@@ -13,9 +14,15 @@ from sklearn.feature_extraction.text import CountVectorizer
 dtype = np.int32
 START_OF_SENTENCE = "SOS"
 END_OF_SENTENCE = "EOS"
-POS_TYPES = ["CC", "CD", "DT", "EX", "FW", "IN", "JJ", "JJR", "JJS", "LS", "MD", "NN", "NNS", "NNP", "NNPS", "PDT", "POS", "PRP", "PRP$", "RB", "RBR", "RBS", "RP", "SYM", "TO", "UH", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "WDT", "WP", "WP$", "WRB"]
-cv = CountVectorizer(dtype=dtype)
-cv.fit(POS_TYPES + [START_OF_SENTENCE, END_OF_SENTENCE])
+DEFAULT_NGRAM_WINDOW = 2
+POS_TYPES = ["CC", "CD", "DT", "EX", "FW", "IN", "JJ", "JJR", "JJS", "LS", "MD", "NN", "NNS", "NNP", "NNPS", "PDT", "POS", "PRP", "RB", "RBR", "RBS", "RP", "SYM", "TO", "UH", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "WDT", "WP", "WRB"]
+cv_normal = CountVectorizer(dtype=dtype)
+cv_normal.fit(POS_TYPES + [START_OF_SENTENCE, END_OF_SENTENCE])
+cv_ngram = CountVectorizer(dtype=dtype)
+cv_ngram.fit(["_".join(p) for p in itertools.product(
+    POS_TYPES + [START_OF_SENTENCE, END_OF_SENTENCE],
+    repeat=DEFAULT_NGRAM_WINDOW)])
+print(len(cv_ngram.vocabulary_))
 
 
 def _get_bag_of_pos(words, index, N):
@@ -48,7 +55,7 @@ def _vectorise_bag_of_pos(words, indexes, N):
     for index in indexes:
         poss = _get_bag_of_pos(words, index, N)
         matrixes.append(" ".join(poss))
-    return cv.transform(matrixes).toarray().flatten()
+    return cv_normal.transform(matrixes).toarray().flatten()
 
 
 def _get_bag_of_pos_ngram(words, index, window_size, N):
@@ -67,8 +74,25 @@ def _get_bag_of_pos_ngram(words, index, window_size, N):
     words = [sos] * (window_size + N) + words + [eos] * (window_size + N)
     index += (window_size + N)
     return [
-        "-".join([w.pos for w in words[i:i+N]])
+        "_".join([w.pos.replace('$', '') for w in words[i:i+N]])
         for i in range(index-window_size, index+window_size+1)]
+
+
+def _vectorise_bag_of_pos_ngram(words, indexes, window_size, N=DEFAULT_NGRAM_WINDOW):
+    """Return pos list surrounding index
+    Args:
+        words (list): stanfordnlp word list object having pos attributes.
+        indexes (List[int]): target indexes
+        window_size (int): target window size return +/- N word pos n-grma
+        N (int): n-gram set
+    Return:
+        pos_list (List[str]): xpo format string list
+    """
+    matrixes = []
+    for index in indexes:
+        poss = _get_bag_of_pos_ngram(words, index, window_size, N)
+        matrixes.append(" ".join(poss))
+    return cv_ngram.transform(matrixes).toarray().flatten()
 
 
 def _get_classify_labels(df):
