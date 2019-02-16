@@ -66,37 +66,71 @@ def _get_classify_labels(df):
     return labels
 
 
+def _preprocess_data(df):
+    """Preprocess task speccific pipeline.
+    Args:
+        df (DataFrame): target pandas DataFrame object.
+    Return:
+        X (array): explanatory variables in task. shape is (n_sumples, n_features)
+        Y (array): objective variables in task. shape is (n_sumples, 1)
+    """
+    X = []
+    Y = _get_classify_labels(df)
+    for i in range(len(df)):
+        words, pronnoun_index = utils.charpos_to_word_index(df['Text'][i], df['Pronoun-offset'][i])
+        _, A_index = utils.charpos_to_word_index(df['Text'][i], df['A-offset'][i], words=words)
+        _, B_index = utils.charpos_to_word_index(df['Text'][i], df['B-offset'][i], words=words)
+        X.append(_vectorise_bag_of_pos(words, [pronnoun_index, A_index, B_index], 5))
+    return X, Y
+
+
 def train(use_preprocessdata=False):
     if use_preprocessdata:
         try:
-            with open('preprocesseddata.pkl', 'rb') as f:
+            with open('preprocess_traindata.pkl', 'rb') as f:
                 X, Y = pickle.load(f)
         except:  # noqa
             use_preprocessdata = False
 
     if not use_preprocessdata:
-        df = pandas.read_csv('dataset/gap-development.tsv', sep='\t')
-        X = []
-        Y = _get_classify_labels(df)
-        print(Y[0])
-        for i in range(len(df)):
-            words, pronnoun_index = utils.charpos_to_word_index(df['Text'][i], df['Pronoun-offset'][i])
-            _, A_index = utils.charpos_to_word_index(df['Text'][i], df['A-offset'][i], words=words)
-            _, B_index = utils.charpos_to_word_index(df['Text'][i], df['B-offset'][i], words=words)
-            X.append(_vectorise_bag_of_pos(words, [pronnoun_index, A_index, B_index], 5))
-        print(X[0])
+        df = pandas.read_csv('dataset/gap-test.tsv', sep='\t')
+        X, Y = _preprocess_data(df)
+        print("Data Loaded")
 
-        with open('preprocesseddata.pkl', 'wb') as f:
+        with open('preprocess_traindata.pkl', 'wb') as f:
             pickle.dump((X, Y), f, protocol=pickle.HIGHEST_PROTOCOL)
     lr = LogisticRegression(random_state=0)
     lr.fit(X, Y)
     with open('model.pkl', 'wb') as f:
         pickle.dump(lr, f, protocol=pickle.HIGHEST_PROTOCOL)
     y_pred = lr.predict(X)
-    print(accuracy_score(Y, y_pred))
+    print("Train Accuracy:", accuracy_score(Y, y_pred))
 
 
-def evaluate(test_data):
-    pass
+def evaluate(test_data, use_preprocess_testdata=True):
+    if use_preprocess_testdata:
+        try:
+            with open('preprocess_testdata.pkl', 'rb') as f:
+                X, Y = pickle.load(f)
+        except:  # noqa
+            use_preprocess_testdata = False
+
+    if not use_preprocess_testdata:
+        X, Y = _preprocess_data(test_data)
+        print("Data Loaded")
+
+        with open('preprocess_testdata.pkl', 'wb') as f:
+            pickle.dump((X, Y), f, protocol=pickle.HIGHEST_PROTOCOL)
+
+    with open('model.pkl', 'rb') as f:
+        model = pickle.load(f)
+    y_pred = model.predict(X)
+    print("Test Accuracy:", accuracy_score(Y, y_pred))
+
+    predicts = model.predict_proba(X)
+    out_df = pandas.DataFrame(data=predicts, columns=['A', 'B', 'NEITHER'])
+    out_df['ID'] = test_data['ID']
+    return out_df
+
 
 train(use_preprocessdata=True)
