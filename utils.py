@@ -2,7 +2,7 @@ import stanfordnlp
 nlp = stanfordnlp.Pipeline(use_gpu=False, processors='tokenize,lemma,pos')
 
 
-def charpos_to_word_index(string, pos):
+def charpos_to_word_index(string, pos, words=None):
     """Convert character position to word index.
     Args:
         string (str): target sentence
@@ -12,9 +12,10 @@ def charpos_to_word_index(string, pos):
         word_index (int): responsible word index in all sentence.
     """
     doc = nlp(string)
-    words = []
-    for s in doc.sentences:
-        words.extend(s.words)
+    if words is None:
+        words = []
+        for s in doc.sentences:
+            words.extend(s.words)
 
     doc = nlp(string[pos:])
     after_words = []
