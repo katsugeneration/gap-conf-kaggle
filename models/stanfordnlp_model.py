@@ -39,7 +39,7 @@ def _get_bag_of_pos(words, index, N):
     eos = DummyWord(pos=END_OF_SENTENCE)
     words = [sos] * N + words + [eos] * N
     index += N
-    return [w.pos for w in words[index-N:index+N+1]]
+    return [w.pos.replace('$', '') for w in words[index-N:index+N+1]]
 
 
 def _vectorise_bag_of_pos(words, indexes, N):

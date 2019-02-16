@@ -11,7 +11,7 @@ def test_get_bag_of_pos():
             274)
     poss = stanfordnlp_model._get_bag_of_pos(words, index, 5)
     eq_(11, len(poss))
-    eq_([w.pos for w in words[index-5:index+6]], poss)
+    eq_([w.pos.replace('$', '') for w in words[index-5:index+6]], poss)
 
 
 def test_get_bag_of_pos_case_start_0():
