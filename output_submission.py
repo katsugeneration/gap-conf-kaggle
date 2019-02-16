@@ -1,6 +1,7 @@
 import importlib
 import argparse
 import load_data
+import score
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -21,3 +22,4 @@ model = importlib.import_module('models.' + args.model)
 df = load_data.load('dataset/gap-development.tsv')
 evals = model.evaluate(df)
 evals.to_csv(args.output_path, columns=['ID', 'A', 'B', 'NEITHER'], header=True, index=False)
+print(score.calc_score('dataset/gap-development.tsv', args.output_path))
