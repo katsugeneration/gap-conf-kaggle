@@ -47,6 +47,23 @@ def _vectorise_bag_of_pos(words, indexes, N):
     return cv.transform(matrixes).toarray().flatten()
 
 
+def _get_classify_labels(df):
+    """Return task classify label
+
+    if A-coref is True, return 0
+    if B-coref is True, return 1
+    if A-coref and B-coref is Fale, return 2
+    Args:
+        df (DataFram): pandas DataFrame object
+    Return:
+        labels (array): label values. type of numpy int32 array. shaep is (N, 1)
+    """
+    labels = np.ones((len(df), 1), dtype=dtype) * 2
+    labels[df['A-coref']] = 0
+    labels[df['B-coref']] = 1
+    return labels
+
+
 def evaluate(test_data):
     df = pandas.read_csv('dataset/gap-development.tsv', sep='\t')
 

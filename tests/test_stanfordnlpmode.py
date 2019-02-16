@@ -1,3 +1,5 @@
+import pandas
+import numpy as np
 import utils
 from models import stanfordnlp_model
 from nose.tools import eq_, ok_
@@ -25,3 +27,9 @@ def test_vectorise_bag_of_pos():
             274)
     vectors = stanfordnlp_model._vectorise_bag_of_pos(words, [index, index], 5)
     eq_((2 * 36, ), vectors.shape)
+
+
+def test_get_classify_labels():
+    data = pandas.DataFrame(data=[[True, False], [False, True], [False, False]], columns=['A-coref', 'B-coref'])
+    labels = stanfordnlp_model._get_classify_labels(data)
+    np.testing.assert_array_equal([[0], [1], [2]], labels)
