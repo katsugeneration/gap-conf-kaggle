@@ -68,39 +68,44 @@ def _get_classify_labels(df):
     return labels
 
 
-def _preprocess_data(df):
+def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     """Preprocess task speccific pipeline.
     Args:
         df (DataFrame): target pandas DataFrame object.
+        use_preprocessdata (bool): Wheter or not to use local preprocess file loading
+        save_path (str): local preprocess file path
     Return:
         X (array): explanatory variables in task. shape is (n_sumples, n_features)
         Y (array): objective variables in task. shape is (n_sumples, 1)
     """
-    X = []
-    Y = _get_classify_labels(df)
-    for i in range(len(df)):
-        words, pronnoun_index = utils.charpos_to_word_index(df['Text'][i], df['Pronoun-offset'][i])
-        _, A_index = utils.charpos_to_word_index(df['Text'][i], df['A-offset'][i], words=words)
-        _, B_index = utils.charpos_to_word_index(df['Text'][i], df['B-offset'][i], words=words)
-        X.append(_vectorise_bag_of_pos(words, [pronnoun_index, A_index, B_index], 5))
-    return X, Y
-
-
-def train(use_preprocessdata=False):
     if use_preprocessdata:
         try:
-            with open('preprocess_traindata.pkl', 'rb') as f:
-                X, Y = pickle.load(f)
+            with open(save_path, 'rb') as f:
+                data = pickle.load(f)
         except:  # noqa
             use_preprocessdata = False
 
     if not use_preprocessdata:
-        df = pandas.read_csv('dataset/gap-test.tsv', sep='\t')
-        X, Y = _preprocess_data(df)
-        print("Data Loaded")
+        data = []
+        for i in range(len(df)):
+            words, pronnoun_index = utils.charpos_to_word_index(df['Text'][i], df['Pronoun-offset'][i])
+            _, A_index = utils.charpos_to_word_index(df['Text'][i], df['A-offset'][i], words=words)
+            _, B_index = utils.charpos_to_word_index(df['Text'][i], df['B-offset'][i], words=words)
+            data.append((words, [pronnoun_index, A_index, B_index]))
+        with open(save_path, 'wb') as f:
+            pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
+    print("Data Loaded")
 
-        with open('preprocess_traindata.pkl', 'wb') as f:
-            pickle.dump((X, Y), f, protocol=pickle.HIGHEST_PROTOCOL)
+    X = []
+    for (words, indexes) in data:
+        X.append(_vectorise_bag_of_pos(words, indexes, 5))
+    Y = _get_classify_labels(df)
+    return X, Y
+
+
+def train(use_preprocessdata=True):
+    df = pandas.read_csv('dataset/gap-test.tsv', sep='\t')
+    X, Y = _preprocess_data(df, use_preprocessdata=use_preprocessdata, save_path='preprocess_traindata.pkl')
     model = LogisticRegression(random_state=0)
     # model = SVC(C=10, probability=True, random_state=0)
     # model = MLPClassifier(hidden_layer_sizes=(50, 30, 30, 50), activation='relu', solver='adam', batch_size=128, random_state=0)
@@ -111,21 +116,8 @@ def train(use_preprocessdata=False):
     print("Train Accuracy:", accuracy_score(Y, y_pred))
 
 
-def evaluate(test_data, use_preprocess_testdata=True):
-    if use_preprocess_testdata:
-        try:
-            with open('preprocess_testdata.pkl', 'rb') as f:
-                X, Y = pickle.load(f)
-        except:  # noqa
-            use_preprocess_testdata = False
-
-    if not use_preprocess_testdata:
-        X, Y = _preprocess_data(test_data)
-        print("Data Loaded")
-
-        with open('preprocess_testdata.pkl', 'wb') as f:
-            pickle.dump((X, Y), f, protocol=pickle.HIGHEST_PROTOCOL)
-
+def evaluate(test_data, use_preprocessdata=True):
+    X, Y = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
     with open('model.pkl', 'rb') as f:
         model = pickle.load(f)
     y_pred = model.predict(X)
@@ -137,4 +129,4 @@ def evaluate(test_data, use_preprocess_testdata=True):
     return out_df
 
 
-train(use_preprocessdata=True)
+train()
