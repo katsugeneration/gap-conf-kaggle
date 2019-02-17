@@ -95,6 +95,23 @@ def _vectorise_bag_of_pos_ngram(words, indexes, window_size, N=DEFAULT_NGRAM_WIN
     return cv_ngram.transform(matrixes).toarray().flatten()
 
 
+def _get_bag_of_pos_with_position(words, index, N):
+    """Return pos list surrounding index
+    Args:
+        words (list): stanfordnlp word list object having pos attributes.
+        index (int): target index
+        N (int): return +/- N word pos
+    Return:
+        pos_list (List[str]): xpo format string list
+    """
+    DummyWord = namedtuple("DummyWord", "pos")
+    sos = DummyWord(pos=START_OF_SENTENCE)
+    eos = DummyWord(pos=END_OF_SENTENCE)
+    words = [sos] * N + words + [eos] * N
+    index += N
+    return [w.pos.replace('$', '') + '_' + str(i-N) for i, w in enumerate(words[index-N:index+N+1])]
+
+
 def _get_classify_labels(df):
     """Return task classify label
 
