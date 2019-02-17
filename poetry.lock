@@ -375,8 +375,20 @@ optional = false
 python-versions = "*"
 version = "0.1.7"
 
+[[package]]
+category = "main"
+description = "XGBoost Python Package"
+name = "xgboost"
+optional = false
+python-versions = "*"
+version = "0.81"
+
+[package.dependencies]
+numpy = "*"
+scipy = "*"
+
 [metadata]
-content-hash = "43a1350ff791bea9acb6e663111f6535d55e834ad473736cac87c34d52965387"
+content-hash = "f895b7b499170911e08bd330c2377599a841087fbbddbf31d070c33dd10ecb3f"
 python-versions = "3.6.8"
 
 [metadata.hashes]
@@ -418,3 +430,4 @@ traitlets = ["9c4bd2d267b7153df9152698efb1050a5d84982d3384a37b2c1f7723ba3e7835",
 urllib3 = ["61bf29cada3fc2fbefad4fdf059ea4bd1b4a86d2b6d15e1c7c0b582b9752fe39", "de9529817c93f27c8ccbfead6985011db27bd0ddfcdb2d86f3f663385c6a9c22"]
 virtualenv = ["8b9abfc51c38b70f61634bf265e5beacf6fae11fc25d355d1871f49b8e45f0db", "cceab52aa7d4df1e1871a70236eb2b89fcfe29b6b43510d9738689787c513261"]
 wcwidth = ["3df37372226d6e63e1b1e1eda15c594bca98a22d33a23832a90998faa96bc65e", "f4ebe71925af7b40a864553f761ed559b43544f8f71746c2d756c7fe788ade7c"]
+xgboost = ["012d79d731f866b42600c127ba3cade2a1046396ba6f425976ecc8deb03bc67b", "e75863efa986f24819a5adf4a9f81a611d70d90164cc0a31a7178ba9f517a6d7", "f7c8057610350b0b2f91e1ac7c034f2f03d233919d111759346559e628061e0c"]

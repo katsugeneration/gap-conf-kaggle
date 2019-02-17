@@ -9,11 +9,12 @@ from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.feature_extraction.text import CountVectorizer
+import xgboost as xgb
 
 
 dtype = np.int32
 DEFAULT_NGRAM_WINDOW = 2
-DEFAULT_WINDOW_SIZE = 3
+DEFAULT_WINDOW_SIZE = 5
 
 DummyWord = namedtuple("DummyWord", "pos")
 cv_normal = CountVectorizer(dtype=dtype)
@@ -174,7 +175,8 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
 
     X = []
     for (words, indexes) in data:
-        X.append(_vectorise_bag_of_pos(words, indexes, DEFAULT_WINDOW_SIZE))
+        X.append(_vectorise_bag_of_pos_with_position(words, indexes, DEFAULT_WINDOW_SIZE))
+    X = np.array(X)
     Y = _get_classify_labels(df)
     return X, Y
 
@@ -182,7 +184,10 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
 def train(use_preprocessdata=True):
     df = pandas.read_csv('dataset/gap-test.tsv', sep='\t')
     X, Y = _preprocess_data(df, use_preprocessdata=use_preprocessdata, save_path='preprocess_traindata.pkl')
-    model = LogisticRegression(random_state=0)
+    validation_df = pandas.read_csv('dataset/gap-validation.tsv', sep='\t')
+    validation_X, validation_Y = _preprocess_data(validation_df, use_preprocessdata=use_preprocessdata, save_path='preprocess_valdata.pkl')
+    # model = LogisticRegression(random_state=0)
+    model = xgb.XGBClassifier(max_depth=5, n_jobs=8, random_state=0)
     # model = SVC(C=10, probability=True, random_state=0)
     # model = MLPClassifier(hidden_layer_sizes=(50, 30, 30, 50), activation='relu', solver='adam', batch_size=128, random_state=0)
     model.fit(X, Y)
