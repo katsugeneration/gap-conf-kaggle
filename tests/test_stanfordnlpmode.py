@@ -35,7 +35,6 @@ def test_get_classify_labels():
     np.testing.assert_array_equal([[0], [1], [2]], labels)
 
 
-
 def test_get_bag_of_pos_ngram():
     words, index = utils.charpos_to_word_index(
             "Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
@@ -59,6 +58,7 @@ def test_vectorise_bag_of_pos_ngram():
     vectors = stanfordnlp_model._vectorise_bag_of_pos_ngram(words, [index, index], 5)
     eq_((2 * 36 * 36, ), vectors.shape)
 
+
 def test_get_bag_of_pos_with_position():
     words, index = utils.charpos_to_word_index(
             "Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
@@ -66,3 +66,11 @@ def test_get_bag_of_pos_with_position():
     poss = stanfordnlp_model._get_bag_of_pos_with_position(words, index, 5)
     eq_(11, len(poss))
     eq_([w.pos.replace('$', '')  + '_' + str(i-5) for i, w in enumerate(words[index-5:index+6])], poss)
+
+
+def test_vectorise_bag_of_pos_with_position():
+    words, index = utils.charpos_to_word_index(
+            "Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
+            274)
+    vectors = stanfordnlp_model._vectorise_bag_of_pos_with_position(words, [index, index], 3)
+    eq_((2 * 36 * 7, ), vectors.shape)
