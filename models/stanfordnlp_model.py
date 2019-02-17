@@ -174,7 +174,7 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
 
     X = []
     for (words, indexes) in data:
-        X.append(_vectorise_bag_of_pos(words, indexes, 3))
+        X.append(_vectorise_bag_of_pos(words, indexes, DEFAULT_WINDOW_SIZE))
     Y = _get_classify_labels(df)
     return X, Y
 
@@ -205,4 +205,4 @@ def evaluate(test_data, use_preprocessdata=True):
     return out_df
 
 
-# train()
+train()
