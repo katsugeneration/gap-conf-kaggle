@@ -15,7 +15,7 @@ import xgboost as xgb
 
 dtype = np.int32
 DEFAULT_NGRAM_WINDOW = 2
-DEFAULT_WINDOW_SIZE = 5
+DEFAULT_WINDOW_SIZE = 10
 
 DummyWord = namedtuple("DummyWord", "pos")
 cv_normal = CountVectorizer(dtype=dtype)
@@ -193,8 +193,11 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     for (words, indexes) in data:
         X.append(_vectorise_bag_of_pos_with_position(words, indexes, DEFAULT_WINDOW_SIZE))
     X = np.array(X)
+    featur_len = int(X.shape[1] / 3)
     X = np.concatenate((
-        X, _get_sexial_labels(df),
+        X[:, 0:featur_len] - X[:, featur_len:featur_len*2],
+        X[:, 0:featur_len] - X[:, featur_len*2:featur_len*3],
+        _get_sexial_labels(df),
         (df['Pronoun-offset'] - df['A-offset']).values.reshape(len(X), 1),
         (df['Pronoun-offset'] - df['B-offset']).values.reshape(len(X), 1)), axis=1)
     Y = _get_classify_labels(df)
