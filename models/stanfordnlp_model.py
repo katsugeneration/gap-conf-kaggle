@@ -7,14 +7,15 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, log_loss
 from sklearn.feature_extraction.text import CountVectorizer
+import optuna
 import xgboost as xgb
 
 
 dtype = np.int32
 DEFAULT_NGRAM_WINDOW = 2
-DEFAULT_WINDOW_SIZE = 5
+DEFAULT_WINDOW_SIZE = 10
 
 DummyWord = namedtuple("DummyWord", "pos")
 cv_normal = CountVectorizer(dtype=dtype)
@@ -186,11 +187,36 @@ def train(use_preprocessdata=True):
     X, Y = _preprocess_data(df, use_preprocessdata=use_preprocessdata, save_path='preprocess_traindata.pkl')
     validation_df = pandas.read_csv('dataset/gap-validation.tsv', sep='\t')
     validation_X, validation_Y = _preprocess_data(validation_df, use_preprocessdata=use_preprocessdata, save_path='preprocess_valdata.pkl')
-    # model = LogisticRegression(random_state=0)
-    model = xgb.XGBClassifier(max_depth=5, n_jobs=8, random_state=0)
-    # model = SVC(C=10, probability=True, random_state=0)
-    # model = MLPClassifier(hidden_layer_sizes=(50, 30, 30, 50), activation='relu', solver='adam', batch_size=128, random_state=0)
-    model.fit(X, Y)
+
+    def objective(trial):
+        eta = trial.suggest_loguniform('eta', 0.001, 0.1)
+        max_depth = trial.suggest_int('max_depth', 3, 25)
+        gamma = trial.suggest_loguniform('gamma', 0.05, 1.0)
+        min_child_weight = trial.suggest_int('min_child_weight', 1, 7)
+        subsample = trial.suggest_discrete_uniform('subsample', 0.6, 1.0, 0.1)
+        colsample_bytree = trial.suggest_discrete_uniform('colsample_bytree', 0.6, 1.0, 0.1)
+        model = xgb.XGBClassifier(
+            max_depth=max_depth,
+            eta=eta,
+            gamma=gamma,
+            min_child_weight=min_child_weight,
+            subsample=subsample,
+            colsample_bytree=colsample_bytree,
+            n_jobs=1,
+            random_state=0)
+        # model = LogisticRegression(random_state=0)
+        # model = SVC(C=10, probability=True, random_state=0)
+        # model = MLPClassifier(hidden_layer_sizes=(50, 30, 30, 50), activation='relu', solver='adam', batch_size=128, random_state=0)
+        model.fit(X, Y.flatten())
+        return log_loss(validation_Y, model.predict_proba(validation_X))
+
+    study = optuna.create_study(study_name='gap-conf-kaggle')
+    study.optimize(objective, n_trials=100, n_jobs=-1)
+    print(study.best_params)
+    print(study.best_value)
+
+    model = xgb.XGBClassifier(n_jobs=-1, random_state=0, **study.best_params)
+    model.fit(X, Y.flatten())
     with open('model.pkl', 'wb') as f:
         pickle.dump(model, f, protocol=pickle.HIGHEST_PROTOCOL)
     y_pred = model.predict(X)
