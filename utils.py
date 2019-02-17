@@ -4,7 +4,14 @@ nlp = stanfordnlp.Pipeline(use_gpu=False, processors='tokenize,lemma,pos')
 
 START_OF_SENTENCE = "SOS"
 END_OF_SENTENCE = "EOS"
-POS_TYPES = ["CC", "CD", "DT", "EX", "FW", "IN", "JJ", "JJR", "JJS", "LS", "MD", "NN", "NNS", "NNP", "NNPS", "PDT", "POS", "PRP", "RB", "RBR", "RBS", "RP", "SYM", "TO", "UH", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "WDT", "WP", "WRB"]
+POS_TYPES = ["CC", "CD", "DT", "EX", "FW", "IN", "JJ", "JJR", "JJS", "LS", "MD", "NN", "NNS", "NNP", "NNPS", "PDT", "POS", "PRP", "RB", "RBR", "RBS", "RP", "SYM", "TO", "UH", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "WDT", "WP", "WRB" ".", ","]
+UPOS_TYPES = ["ADJ", "ADP", "PUNCT", "ADV", "AUX", "SYM", "INTJ",  "CCONJ", "X", "NOUN", "DET", "PROPN", "NUM", "VERB", "PART", "PRON", "SCONJ"]
+CONTENT_DEPRELS = [
+    "nsubj", "obj", "iobj", "csubj", "ccomp", "xcomp", "obl", "vocative",
+    "expl", "dislocated", "advcl", "advmod", "discourse", "nmod", "appos",
+    "nummod", "acl", "amod", "conj", "fixed", "flat", "compound", "list",
+    "parataxis", "orphan", "goeswith", "reparandum", "root", "dep"
+]
 
 
 def charpos_to_word_index(string, pos, words=None):
