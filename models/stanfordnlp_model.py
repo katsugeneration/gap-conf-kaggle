@@ -146,6 +146,21 @@ def _get_classify_labels(df):
     return labels
 
 
+def _get_sexial_labels(df):
+    """Return sexila labels
+
+    if Pronoun is she or her, return 0
+    else return 1
+    Args:
+        df (DataFram): pandas DataFrame object
+    Return:
+        labels (array): label values. type of numpy int32 array. shaep is (N, 1)
+    """
+    labels = np.ones((len(df), 1), dtype=dtype)
+    labels[df['Pronoun'].str.lower().isin(['she', 'her'])] = 0
+    return labels
+
+
 def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     """Preprocess task speccific pipeline.
     Args:
@@ -178,6 +193,7 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     for (words, indexes) in data:
         X.append(_vectorise_bag_of_pos_with_position(words, indexes, DEFAULT_WINDOW_SIZE))
     X = np.array(X)
+    X = np.concatenate((X, _get_sexial_labels(df)), axis=1)
     Y = _get_classify_labels(df)
     return X, Y
 
@@ -193,8 +209,8 @@ def train(use_preprocessdata=True):
         max_depth = trial.suggest_int('max_depth', 3, 25)
         gamma = trial.suggest_loguniform('gamma', 0.05, 1.0)
         min_child_weight = trial.suggest_int('min_child_weight', 1, 7)
-        subsample = trial.suggest_discrete_uniform('subsample', 0.6, 1.0, 0.1)
-        colsample_bytree = trial.suggest_discrete_uniform('colsample_bytree', 0.6, 1.0, 0.1)
+        subsample = trial.suggest_uniform('subsample', 0.6, 1.0)
+        colsample_bytree = trial.suggest_uniform('colsample_bytree', 0.6, 1.0)
         model = xgb.XGBClassifier(
             max_depth=max_depth,
             eta=eta,
@@ -207,13 +223,30 @@ def train(use_preprocessdata=True):
         # model = LogisticRegression(random_state=0)
         # model = SVC(C=10, probability=True, random_state=0)
         # model = MLPClassifier(hidden_layer_sizes=(50, 30, 30, 50), activation='relu', solver='adam', batch_size=128, random_state=0)
-        model.fit(X, Y.flatten())
+
+        def _log_loss(y_pred, y):
+            """For XGBoost logloss calculator."""
+            y = y.get_label()
+            y_pred = y_pred.reshape((len(y), 3))
+            return 'logloss', log_loss(y, y_pred)
+
+        pruning_callback = optuna.integration.XGBoostPruningCallback(trial, 'validation_0-logloss')
+        model.fit(
+            X,
+            Y.flatten(),
+            eval_set=[(validation_X, validation_Y.flatten())],
+            eval_metric=_log_loss,
+            callbacks=[pruning_callback],
+            verbose=False)
         return log_loss(validation_Y, model.predict_proba(validation_X))
 
-    study = optuna.create_study(study_name='gap-conf-kaggle')
-    study.optimize(objective, n_trials=100, n_jobs=-1)
-    print(study.best_params)
-    print(study.best_value)
+    study = optuna.create_study(
+        study_name='gap-conf-kaggle',
+        pruner=optuna.pruners.MedianPruner(),
+        sampler=optuna.samplers.TPESampler(seed=0))
+    study.optimize(objective, n_trials=1000, n_jobs=-1)
+    print("Best Params", study.best_params)
+    print("Best Validation Value", study.best_value)
 
     model = xgb.XGBClassifier(n_jobs=-1, random_state=0, **study.best_params)
     model.fit(X, Y.flatten())
@@ -224,6 +257,7 @@ def train(use_preprocessdata=True):
 
 
 def evaluate(test_data, use_preprocessdata=True):
+    train()
     X, Y = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
     with open('model.pkl', 'rb') as f:
         model = pickle.load(f)
@@ -234,6 +268,3 @@ def evaluate(test_data, use_preprocessdata=True):
     out_df = pandas.DataFrame(data=predicts, columns=['A', 'B', 'NEITHER'])
     out_df['ID'] = test_data['ID']
     return out_df
-
-
-train()
