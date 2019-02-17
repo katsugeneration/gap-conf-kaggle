@@ -193,7 +193,10 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     for (words, indexes) in data:
         X.append(_vectorise_bag_of_pos_with_position(words, indexes, DEFAULT_WINDOW_SIZE))
     X = np.array(X)
-    X = np.concatenate((X, _get_sexial_labels(df)), axis=1)
+    X = np.concatenate((
+        X, _get_sexial_labels(df),
+        [d[1] for d in data],
+        df[['Pronoun-offset', 'A-offset', 'B-offset']].values), axis=1)
     Y = _get_classify_labels(df)
     return X, Y
 
