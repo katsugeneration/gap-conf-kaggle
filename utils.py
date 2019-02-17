@@ -20,12 +20,12 @@ def charpos_to_word_index(string, pos, words=None):
     if words is None:
         words = []
         for s in doc.sentences:
-            words.extend(s.words)
+            words.extend([w for w in s.words if w.pos.replace('$', '') in POS_TYPES])
 
     doc = nlp(string[pos:])
     after_words = []
     for s in doc.sentences:
-        after_words.extend(s.words)
+        after_words.extend([w for w in s.words if w.pos.replace('$', '') in POS_TYPES])
 
     return words, len(words) - len(after_words)
 
@@ -43,7 +43,7 @@ def get_same_word_index(string, word):
     doc = nlp(string)
     words = []
     for s in doc.sentences:
-        words.extend(s.words)
+        words.extend([w for w in s.words if w.pos.replace('$', '') in POS_TYPES])
 
     indexes = []
     for i, w in enumerate(words):
