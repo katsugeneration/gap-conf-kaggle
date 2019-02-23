@@ -161,15 +161,14 @@ def _get_sexial_labels(df):
     return labels
 
 
-def _preprocess_data(df, use_preprocessdata=False, save_path=None):
-    """Preprocess task speccific pipeline.
+def _load_data(df, use_preprocessdata=False, save_path=None):
+    """Load preprocess task speccific data.
     Args:
         df (DataFrame): target pandas DataFrame object.
         use_preprocessdata (bool): Wheter or not to use local preprocess file loading
         save_path (str): local preprocess file path
     Return:
-        X (array): explanatory variables in task. shape is (n_sumples, n_features)
-        Y (array): objective variables in task. shape is (n_sumples, 1)
+        data (List[tuple]): words and indexes tuple list. Tulpe foramt is (sentence_words, [Pronnoun, A, B])
     """
     if use_preprocessdata:
         try:
@@ -188,7 +187,20 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
         with open(save_path, 'wb') as f:
             pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
     print("Data Loaded")
+    return data
 
+
+def _preprocess_data(df, use_preprocessdata=False, save_path=None):
+    """Preprocess task speccific pipeline.
+    Args:
+        df (DataFrame): target pandas DataFrame object.
+        use_preprocessdata (bool): Wheter or not to use local preprocess file loading
+        save_path (str): local preprocess file path
+    Return:
+        X (array): explanatory variables in task. shape is (n_sumples, n_features)
+        Y (array): objective variables in task. shape is (n_sumples, 1)
+    """
+    data = _load_data(df, use_preprocessdata, save_path)
     X = []
     for (words, indexes) in data:
         X.append(_vectorise_bag_of_pos_with_position(words, indexes, DEFAULT_WINDOW_SIZE))

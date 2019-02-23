@@ -1,5 +1,7 @@
 import pandas
 import load_data
+import numpy as np
+from models import stanfordnlp_model
 
 
 print('Train data Analysis')
@@ -34,6 +36,79 @@ he_names = pandas.concat([
 print("He values count", len(he_names))
 print("She unique values count", len(set(she_names) - set(he_names)))
 print("He unique values count", len(set(he_names) - set(she_names)))
+
+# Pos different check
+data = stanfordnlp_model._load_data(df, True, 'preprocess_testdata.pkl')
+X = []
+for (words, indexes) in data:
+    X.append(stanfordnlp_model._vectorise_bag_of_pos_with_position(words, indexes, stanfordnlp_model.DEFAULT_WINDOW_SIZE))
+X = np.array(X)
+num = len(X)
+featur_len = int(X.shape[1] / 3)
+a_trues = X[df['A-coref']]
+b_trues = X[df['B-coref']]
+all_ngs = X[~(df['A-coref'] | df['B-coref'])]
+true_diffs = np.concatenate([
+    a_trues[:, 0:featur_len] - a_trues[:, featur_len:featur_len*2],
+    b_trues[:, 0:featur_len] - b_trues[:, featur_len*2:featur_len*3],
+])
+false_diffs = np.concatenate([
+    b_trues[:, 0:featur_len] - b_trues[:, featur_len:featur_len*2],
+    a_trues[:, 0:featur_len] - a_trues[:, featur_len*2:featur_len*3],
+    all_ngs[:, 0:featur_len] - all_ngs[:, featur_len:featur_len*2],
+    all_ngs[:, 0:featur_len] - all_ngs[:, featur_len*2:featur_len*3]
+])
+print("True label pos diff mean", np.absolute(true_diffs).sum(axis=1).mean())
+print("False label pos diff mean", np.absolute(false_diffs).sum(axis=1).mean())
+print("True label pos diff variance", np.absolute(true_diffs).sum(axis=1).var())
+print("False label pos diff variance", np.absolute(false_diffs).sum(axis=1).var())
+print("Count True label is diff large case", (np.absolute(true_diffs).sum(axis=1) > np.absolute(false_diffs[:len(true_diffs)]).sum(axis=1)).sum(axis=0))
+
+vocabulary = {v: k for k, v in stanfordnlp_model.cv_position.vocabulary_.items()}
+true_feature_diffs = np.absolute(true_diffs).sum(axis=0)
+false_feature_diffs = np.absolute(false_diffs).sum(axis=0)
+print("True Lable differ feature")
+for i in np.argsort(true_feature_diffs)[-10:]:
+    if i in vocabulary:
+        print(vocabulary[i], true_feature_diffs[i])
+    else:
+        print("Nothing", true_feature_diffs[i])
+print("False Lable differ feature")
+for i in np.argsort(false_feature_diffs)[-10:]:
+    if i in vocabulary:
+        print(vocabulary[i], false_feature_diffs[i])
+    else:
+        print("Nothing", false_feature_diffs[i])
+
+positive_true_feature_diffs = true_diffs.clip(min=0).sum(axis=0)
+positive_false_feature_diffs = false_diffs.clip(min=0).sum(axis=0)
+print("Poitive True Lable differ feature")
+for i in np.argsort(positive_true_feature_diffs)[-10:]:
+    if i in vocabulary:
+        print(vocabulary[i], positive_true_feature_diffs[i])
+    else:
+        print("Nothing", positive_true_feature_diffs[i])
+print("Poitive False Lable differ feature")
+for i in np.argsort(positive_false_feature_diffs)[-10:]:
+    if i in vocabulary:
+        print(vocabulary[i], positive_false_feature_diffs[i])
+    else:
+        print("Nothing", positive_false_feature_diffs[i])
+
+negative_true_feature_diffs = (-true_diffs).clip(min=0).sum(axis=0)
+negative_false_feature_diffs = (-false_diffs).clip(min=0).sum(axis=0)
+print("Negative True Lable differ feature")
+for i in np.argsort(negative_true_feature_diffs)[-10:]:
+    if i in vocabulary:
+        print(vocabulary[i], negative_true_feature_diffs[i])
+    else:
+        print("Nothing", negative_true_feature_diffs[i])
+print("Negative False Lable differ feature")
+for i in np.argsort(negative_false_feature_diffs)[-10:]:
+    if i in vocabulary:
+        print(vocabulary[i], negative_false_feature_diffs[i])
+    else:
+        print("Nothing", negative_false_feature_diffs[i])
 
 
 print('Train data Analysis')
