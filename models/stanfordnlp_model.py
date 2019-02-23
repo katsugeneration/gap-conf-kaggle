@@ -170,7 +170,7 @@ def _get_bag_of_pos_with_dependency(words, index):
     """
     pos_list = []
 
-    def _get_governors(_index, name):
+    def _get_governor(_index, name):
         governor_list = []
         governor_index = _index + (int(words[_index].governor) - int(words[_index].index))
         if governor_index < len(words):
@@ -181,10 +181,10 @@ def _get_bag_of_pos_with_dependency(words, index):
         return governor_index, governor_list
 
     # add governor
-    governor_index, governor_list = _get_governors(index, 'governor')
+    governor_index, governor_list = _get_governor(index, 'governor')
     pos_list.extend(governor_list)
     if governor_index < len(words) and int(words[governor_index].governor) != 0:
-        _, ancestor_list = _get_governors(governor_index, 'ancestor')
+        _, ancestor_list = _get_governor(governor_index, 'ancestor')
         pos_list.extend(ancestor_list)
 
     def _get_children(_index, name):
