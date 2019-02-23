@@ -17,7 +17,7 @@ dtype = np.int32
 DEFAULT_NGRAM_WINDOW = 2
 DEFAULT_WINDOW_SIZE = 10
 
-DummyWord = namedtuple("DummyWord", "pos")
+DummyWord = namedtuple("DummyWord", "pos upos")
 cv_normal = CountVectorizer(dtype=dtype)
 cv_normal.fit(utils.POS_TYPES + [utils.START_OF_SENTENCE, utils.END_OF_SENTENCE])
 cv_ngram = CountVectorizer(dtype=dtype)
@@ -27,6 +27,9 @@ cv_ngram.fit(["_".join(p) for p in itertools.product(
 cv_position = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
 cv_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
     utils.POS_TYPES + [utils.START_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
+cv_upos_position = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
+cv_upos_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
+    utils.UPOS_TYPES + [utils.START_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
 
 
 def _get_bag_of_pos(words, index, N):
@@ -38,9 +41,9 @@ def _get_bag_of_pos(words, index, N):
     Return:
         pos_list (List[str]): xpo format string list
     """
-    sos = DummyWord(pos=utils.START_OF_SENTENCE)
+    bos = DummyWord(pos=utils.START_OF_SENTENCE)
     eos = DummyWord(pos=utils.END_OF_SENTENCE)
-    words = [sos] * N + words + [eos] * N
+    words = [bos] * N + words + [eos] * N
     index += N
     return [w.pos.replace('$', '') for w in words[index-N:index+N+1]]
 
@@ -71,9 +74,9 @@ def _get_bag_of_pos_ngram(words, index, window_size, N):
     Return:
         pos_list (List[str]): xpo format string list
     """
-    sos = DummyWord(pos=utils.START_OF_SENTENCE)
-    eos = DummyWord(pos=utils.END_OF_SENTENCE)
-    words = [sos] * (window_size + N) + words + [eos] * (window_size + N)
+    bos = DummyWord(upos=utils.START_OF_SENTENCE)
+    eos = DummyWord(upos=utils.END_OF_SENTENCE)
+    words = [bos] * (window_size + N) + words + [eos] * (window_size + N)
     index += (window_size + N)
     return [
         "_".join([w.pos.replace('$', '') for w in words[i:i+N]])
@@ -106,9 +109,9 @@ def _get_bag_of_pos_with_position(words, index, N):
     Return:
         pos_list (List[str]): xpo format string list
     """
-    sos = DummyWord(pos=utils.START_OF_SENTENCE)
+    bos = DummyWord(pos=utils.START_OF_SENTENCE)
     eos = DummyWord(pos=utils.END_OF_SENTENCE)
-    words = [sos] * N + words + [eos] * N
+    words = [bos] * N + words + [eos] * N
     index += N
     return [w.pos.replace('$', '') + '_' + str(i-N) for i, w in enumerate(words[index-N:index+N+1])]
 
@@ -127,6 +130,22 @@ def _vectorise_bag_of_pos_with_position(words, indexes, N):
         poss = _get_bag_of_pos_with_position(words, index, N)
         matrixes.append(" ".join(poss))
     return cv_position.transform(matrixes).toarray().flatten()
+
+
+def _get_bag_of_upos_with_position(words, index, N):
+    """Return pos list surrounding index
+    Args:
+        words (list): stanfordnlp word list object having pos attributes.
+        index (int): target index
+        N (int): return +/- N word pos
+    Return:
+        pos_list (List[str]): upos format string list
+    """
+    bos = DummyWord(pos=utils.START_OF_SENTENCE, upos=utils.START_OF_SENTENCE)
+    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
+    words = [bos] * N + words + [eos] * N
+    index += N
+    return [w.upos.replace('$', '') + '_' + str(i-N) for i, w in enumerate(words[index-N:index+N+1])]
 
 
 def _get_classify_labels(df):
