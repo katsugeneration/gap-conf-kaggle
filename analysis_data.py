@@ -66,6 +66,22 @@ print("True label pos diff variance", np.absolute(true_diffs).sum(axis=1).var())
 print("False label pos diff variance", np.absolute(false_diffs).sum(axis=1).var())
 print("Count True label is diff large case", (np.absolute(true_diffs).sum(axis=1) > np.absolute(false_diffs[:len(true_diffs)]).sum(axis=1)).sum(axis=0))
 
+true_sames = np.concatenate([
+    a_trues[:, 0:featur_len] * a_trues[:, featur_len:featur_len*2],
+    b_trues[:, 0:featur_len] * b_trues[:, featur_len*2:featur_len*3],
+])
+false_sames = np.concatenate([
+    b_trues[:, 0:featur_len] * b_trues[:, featur_len:featur_len*2],
+    a_trues[:, 0:featur_len] * a_trues[:, featur_len*2:featur_len*3],
+    all_ngs[:, 0:featur_len] * all_ngs[:, featur_len:featur_len*2],
+    all_ngs[:, 0:featur_len] * all_ngs[:, featur_len*2:featur_len*3]
+])
+print("True label pos same mean", true_sames.sum(axis=1).mean())
+print("False label pos same mean", false_sames.sum(axis=1).mean())
+print("True label pos same variance", true_sames.sum(axis=1).var())
+print("False label pos same variance", false_sames.sum(axis=1).var())
+print("Count True label is same large case", (true_sames.sum(axis=1) > false_sames[:len(true_sames)].sum(axis=1)).sum(axis=0))
+
 vocabulary = {v: k for k, v in stanfordnlp_model.cv_position.vocabulary_.items()}
 true_feature_diffs = np.absolute(true_diffs).sum(axis=0)
 false_feature_diffs = np.absolute(false_diffs).sum(axis=0)
@@ -112,6 +128,20 @@ for i in np.argsort(negative_false_feature_diffs)[-10:]:
     else:
         print("Nothing", negative_false_feature_diffs[i])
 
+true_feature_sames = np.absolute(true_sames).sum(axis=0)
+false_feature_sames = np.absolute(false_sames).sum(axis=0)
+print("True Lable more same feature")
+for i in np.argsort(true_feature_sames)[-10:]:
+    if i in vocabulary:
+        print(vocabulary[i], true_feature_sames[i])
+    else:
+        print("Nothing", true_feature_sames[i])
+print("False Lable more same feature")
+for i in np.argsort(false_feature_sames)[-10:]:
+    if i in vocabulary:
+        print(vocabulary[i], false_feature_sames[i])
+    else:
+        print("Nothing", false_feature_sames[i])
 
 print('Train data Analysis')
 df = load_data.load('dataset/gap-test.tsv')

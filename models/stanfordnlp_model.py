@@ -237,6 +237,8 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     X = np.concatenate((
         X[:, 0:featur_len] - X[:, featur_len:featur_len*2],
         X[:, 0:featur_len] - X[:, featur_len*2:featur_len*3],
+        X[:, 0:featur_len] * X[:, featur_len:featur_len*2],
+        X[:, 0:featur_len] * X[:, featur_len*2:featur_len*3],
         _get_sexial_labels(df),
         (df['Pronoun-offset'] - df['A-offset']).values.reshape(len(X), 1),
         (df['Pronoun-offset'] - df['B-offset']).values.reshape(len(X), 1)), axis=1)
