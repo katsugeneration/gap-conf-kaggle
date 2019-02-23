@@ -4,7 +4,7 @@ nlp = stanfordnlp.Pipeline(use_gpu=False, processors='tokenize,lemma,pos')
 
 BEGIN_OF_SENTENCE = "BOS"
 END_OF_SENTENCE = "EOS"
-POS_TYPES = ["CC", "CD", "DT", "EX", "FW", "IN", "JJ", "JJR", "JJS", "LS", "MD", "NN", "NNS", "NNP", "NNPS", "PDT", "POS", "PRP", "RB", "RBR", "RBS", "RP", "SYM", "TO", "UH", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "WDT", "WP", "WRB"]
+POS_TYPES = ["CC", "CD", "DT", "EX", "FW", "IN", "JJ", "JJR", "JJS", "LS", "MD", "NN", "NNS", "NNP", "NNPS", "PDT", "POS", "PRP", "RB", "RBR", "RBS", "RP", "SYM", "TO", "UH", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "WDT", "WP", "WRB", ".", ",", "?", "!"]
 UPOS_TYPES = ["ADJ", "ADP", "PUNCT", "ADV", "AUX", "SYM", "INTJ",  "CCONJ", "X", "NOUN", "DET", "PROPN", "NUM", "VERB", "PART", "PRON", "SCONJ"]
 CONTENT_DEPRELS = [
     "nsubj", "obj", "iobj", "csubj", "ccomp", "xcomp", "obl", "vocative",
