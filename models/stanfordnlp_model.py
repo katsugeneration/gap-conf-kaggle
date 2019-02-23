@@ -32,12 +32,13 @@ cv_upos_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
     utils.UPOS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
 
 
-def _get_bag_of_pos(words, index, N):
+def _get_bag_of_pos(words, index, N, target_len=1):
     """Return pos list surrounding index
     Args:
         words (list): stanfordnlp word list object having pos attributes.
         index (int): target index
         N (int): return +/- N word pos
+        target_len (int): target word length
     Return:
         pos_list (List[str]): xpo format string list
     """
@@ -45,21 +46,22 @@ def _get_bag_of_pos(words, index, N):
     eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
     words = [bos] * N + words + [eos] * N
     index += N
-    return [w.pos.replace('$', '') for w in words[index-N:index+N+1]]
+    return [w.pos.replace('$', '') for w in words[index-N:index] + [words[index]] + words[index+target_len:index+target_len+N]]
 
 
-def _vectorise_bag_of_pos(words, indexes, N):
+def _vectorise_bag_of_pos(words, indexes, N, targets=[]):
     """Return pos list surrounding index
     Args:
         words (list): stanfordnlp word list object having pos attributes.
         indexes (List[int]): target indexes
         N (int): return +/- N word pos
+        target_len (int): target word length
     Return:
         pos_list (List[str]): xpo format string list
     """
     matrixes = []
-    for index in indexes:
-        poss = _get_bag_of_pos(words, index, N)
+    for i, index in enumerate(indexes):
+        poss = _get_bag_of_pos(words, index, N, target_len=len(targets[i].split()))
         matrixes.append(" ".join(poss))
     return cv_normal.transform(matrixes).toarray().flatten()
 
@@ -100,12 +102,13 @@ def _vectorise_bag_of_pos_ngram(words, indexes, window_size, N=DEFAULT_NGRAM_WIN
     return cv_ngram.transform(matrixes).toarray().flatten()
 
 
-def _get_bag_of_pos_with_position(words, index, N):
+def _get_bag_of_pos_with_position(words, index, N, target_len=1):
     """Return pos list surrounding index
     Args:
         words (list): stanfordnlp word list object having pos attributes.
         index (int): target index
         N (int): return +/- N word pos
+        target_len (int): target word length
     Return:
         pos_list (List[str]): xpo format string list
     """
@@ -113,21 +116,23 @@ def _get_bag_of_pos_with_position(words, index, N):
     eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
     words = [bos] * N + words + [eos] * N
     index += N
-    return [w.pos.replace('$', '') + '_' + str(i-N) for i, w in enumerate(words[index-N:index+N+1])]
+    return [w.pos.replace('$', '') + '_' + str(i-N) for i, w in enumerate(
+        words[index-N:index] + [words[index]] + words[index+target_len:index+target_len+N])]
 
 
-def _vectorise_bag_of_pos_with_position(words, indexes, N):
+def _vectorise_bag_of_pos_with_position(words, indexes, N, targets=[]):
     """Return pos list surrounding index
     Args:
         words (list): stanfordnlp word list object having pos attributes.
         indexes (List[int]): target indexes
         N (int): return +/- N word pos
+        targets (List[str]): target word list. length is same as indexes
     Return:
         pos_list (List[str]): xpo format string list
     """
     matrixes = []
-    for index in indexes:
-        poss = _get_bag_of_pos_with_position(words, index, N)
+    for i, index in enumerate(indexes):
+        poss = _get_bag_of_pos_with_position(words, index, N, target_len=len(targets[i].split()))
         matrixes.append(" ".join(poss))
     return cv_position.transform(matrixes).toarray().flatten()
 
@@ -221,8 +226,10 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     """
     data = _load_data(df, use_preprocessdata, save_path)
     X = []
-    for (words, indexes) in data:
-        X.append(_vectorise_bag_of_pos_with_position(words, indexes, DEFAULT_WINDOW_SIZE))
+    for i, (words, indexes) in enumerate(data):
+        X.append(
+            _vectorise_bag_of_pos_with_position(words, indexes, DEFAULT_WINDOW_SIZE,
+                                                targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
     X = np.array(X)
     featur_len = int(X.shape[1] / 3)
     X = np.concatenate((

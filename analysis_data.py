@@ -40,8 +40,10 @@ print("He unique values count", len(set(he_names) - set(she_names)))
 # Pos different check
 data = stanfordnlp_model._load_data(df, True, 'preprocess_testdata.pkl')
 X = []
-for (words, indexes) in data:
-    X.append(stanfordnlp_model._vectorise_bag_of_pos_with_position(words, indexes, stanfordnlp_model.DEFAULT_WINDOW_SIZE))
+for i, (words, indexes) in enumerate(data):
+    X.append(
+        stanfordnlp_model._vectorise_bag_of_pos_with_position(words, indexes, stanfordnlp_model.DEFAULT_WINDOW_SIZE,
+                                                              targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
 X = np.array(X)
 num = len(X)
 featur_len = int(X.shape[1] / 3)
