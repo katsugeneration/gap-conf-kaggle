@@ -19,17 +19,17 @@ DEFAULT_WINDOW_SIZE = 10
 
 DummyWord = namedtuple("DummyWord", "pos upos")
 cv_normal = CountVectorizer(dtype=dtype)
-cv_normal.fit(utils.POS_TYPES + [utils.START_OF_SENTENCE, utils.END_OF_SENTENCE])
+cv_normal.fit(utils.POS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE])
 cv_ngram = CountVectorizer(dtype=dtype)
 cv_ngram.fit(["_".join(p) for p in itertools.product(
-    utils.POS_TYPES + [utils.START_OF_SENTENCE, utils.END_OF_SENTENCE],
+    utils.POS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE],
     repeat=DEFAULT_NGRAM_WINDOW)])
 cv_position = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
 cv_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
-    utils.POS_TYPES + [utils.START_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
+    utils.POS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
 cv_upos_position = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
 cv_upos_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
-    utils.UPOS_TYPES + [utils.START_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
+    utils.UPOS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
 
 
 def _get_bag_of_pos(words, index, N):
@@ -41,8 +41,8 @@ def _get_bag_of_pos(words, index, N):
     Return:
         pos_list (List[str]): xpo format string list
     """
-    bos = DummyWord(pos=utils.START_OF_SENTENCE)
-    eos = DummyWord(pos=utils.END_OF_SENTENCE)
+    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE)
+    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
     words = [bos] * N + words + [eos] * N
     index += N
     return [w.pos.replace('$', '') for w in words[index-N:index+N+1]]
@@ -74,8 +74,8 @@ def _get_bag_of_pos_ngram(words, index, window_size, N):
     Return:
         pos_list (List[str]): xpo format string list
     """
-    bos = DummyWord(upos=utils.START_OF_SENTENCE)
-    eos = DummyWord(upos=utils.END_OF_SENTENCE)
+    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE)
+    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
     words = [bos] * (window_size + N) + words + [eos] * (window_size + N)
     index += (window_size + N)
     return [
@@ -109,8 +109,8 @@ def _get_bag_of_pos_with_position(words, index, N):
     Return:
         pos_list (List[str]): xpo format string list
     """
-    bos = DummyWord(pos=utils.START_OF_SENTENCE)
-    eos = DummyWord(pos=utils.END_OF_SENTENCE)
+    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE)
+    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
     words = [bos] * N + words + [eos] * N
     index += N
     return [w.pos.replace('$', '') + '_' + str(i-N) for i, w in enumerate(words[index-N:index+N+1])]
@@ -141,7 +141,7 @@ def _get_bag_of_upos_with_position(words, index, N):
     Return:
         pos_list (List[str]): upos format string list
     """
-    bos = DummyWord(pos=utils.START_OF_SENTENCE, upos=utils.START_OF_SENTENCE)
+    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE)
     eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
     words = [bos] * N + words + [eos] * N
     index += N
