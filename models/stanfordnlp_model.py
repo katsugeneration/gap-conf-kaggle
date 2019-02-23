@@ -313,15 +313,25 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     X2 = np.array(X2)
     featur_len = int(X.shape[1] / 3)
     featur_len2 = int(X2.shape[1] / 3)
+    X_pr = X[:, 0:featur_len]
+    X_a = X[:, featur_len:featur_len*2]
+    X_b = X[:, featur_len*2:featur_len*3]
+    X2_pr = X2[:, 0:featur_len2]
+    X2_a = X2[:, featur_len2:featur_len2*2]
+    X2_b = X2[:, featur_len2*2:featur_len2*3]
     X = np.concatenate((
-        X[:, 0:featur_len] - X[:, featur_len:featur_len*2],
-        X[:, 0:featur_len] - X[:, featur_len*2:featur_len*3],
-        X[:, 0:featur_len] * X[:, featur_len:featur_len*2],
-        X[:, 0:featur_len] * X[:, featur_len*2:featur_len*3],
-        X2[:, 0:featur_len2] - X2[:, featur_len2:featur_len2*2],
-        X2[:, 0:featur_len2] - X2[:, featur_len2*2:featur_len2*3],
-        X2[:, 0:featur_len2] * X2[:, featur_len2:featur_len2*2],
-        X2[:, 0:featur_len2] * X2[:, featur_len2*2:featur_len2*3],
+        X_pr - X_a,
+        X_pr - X_b,
+        X_pr * X_a,
+        X_pr * X_b,
+        np.absolute(X_pr - X_a).sum(axis=1, keepdims=True) - np.absolute(X_pr - X_b).sum(axis=1, keepdims=True),
+        np.absolute(X_pr * X_a).sum(axis=1, keepdims=True) - np.absolute(X_pr * X_b).sum(axis=1, keepdims=True),
+        X2_pr - X2_a,
+        X2_pr - X2_b,
+        X2_pr * X2_a,
+        X2_pr * X2_b,
+        np.sum(np.absolute(X2_pr - X2_a), axis=1, keepdims=True) - np.absolute(X2_pr - X2_b).sum(axis=1, keepdims=True),
+        np.absolute(X2_pr * X2_a).sum(axis=1, keepdims=True) - np.absolute(X2_pr * X2_b).sum(axis=1, keepdims=True),
         _get_sexial_labels(df),
         (df['Pronoun-offset'] - df['A-offset']).values.reshape(len(X), 1),
         (df['Pronoun-offset'] - df['B-offset']).values.reshape(len(X), 1)), axis=1)
@@ -388,7 +398,7 @@ def train(use_preprocessdata=True):
 
 
 def evaluate(test_data, use_preprocessdata=True):
-    # train()
+    train()
     X, Y = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
     with open('model.pkl', 'rb') as f:
         model = pickle.load(f)

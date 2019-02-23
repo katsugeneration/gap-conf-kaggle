@@ -40,13 +40,18 @@ print("He unique values count", len(set(he_names) - set(she_names)))
 # Pos different check
 data = stanfordnlp_model._load_data(df, True, 'preprocess_testdata.pkl')
 X = []
+X2 = []
 for i, (words, indexes) in enumerate(data):
     X.append(
         stanfordnlp_model._vectorise_bag_of_pos_with_position(words, indexes, stanfordnlp_model.DEFAULT_WINDOW_SIZE,
                                                               targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
+    X2.append(stanfordnlp_model._vectorise_bag_of_pos_with_dependency(words, indexes))
+
 X = np.array(X)
+X2 = np.array(X2)
 num = len(X)
 featur_len = int(X.shape[1] / 3)
+featur_len2 = int(X2.shape[1] / 3)
 a_trues = X[df['A-coref']]
 b_trues = X[df['B-coref']]
 all_ngs = X[~(df['A-coref'] | df['B-coref'])]
@@ -81,6 +86,41 @@ print("False label pos same mean", false_sames.sum(axis=1).mean())
 print("True label pos same variance", true_sames.sum(axis=1).var())
 print("False label pos same variance", false_sames.sum(axis=1).var())
 print("Count True label is same large case", (true_sames.sum(axis=1) > false_sames[:len(true_sames)].sum(axis=1)).sum(axis=0))
+
+
+a_trues2 = X2[df['A-coref']]
+b_trues2 = X2[df['B-coref']]
+all_ngs2 = X2[~(df['A-coref'] | df['B-coref'])]
+true_diffs2 = np.concatenate([
+    a_trues2[:, 0:featur_len2] - a_trues2[:, featur_len2:featur_len2*2],
+    b_trues2[:, 0:featur_len2] - b_trues2[:, featur_len2*2:featur_len2*3],
+])
+false_diffs2 = np.concatenate([
+    b_trues2[:, 0:featur_len2] - b_trues2[:, featur_len2:featur_len2*2],
+    a_trues2[:, 0:featur_len2] - a_trues2[:, featur_len2*2:featur_len2*3],
+    all_ngs2[:, 0:featur_len2] - all_ngs2[:, featur_len2:featur_len2*2],
+    all_ngs2[:, 0:featur_len2] - all_ngs2[:, featur_len2*2:featur_len2*3]
+])
+print("True label dependency diff mean", np.absolute(true_diffs2).sum(axis=1).mean())
+print("False label dependency diff mean", np.absolute(false_diffs2).sum(axis=1).mean())
+print("True label dependency diff variance", np.absolute(true_diffs2).sum(axis=1).var())
+print("False label dependency diff variance", np.absolute(false_diffs2).sum(axis=1).var())
+print("Count True label is diff large case", (np.absolute(true_diffs2).sum(axis=1) > np.absolute(false_diffs2[:len(true_diffs2)]).sum(axis=1)).sum(axis=0))
+true_sames2 = np.concatenate([
+    a_trues2[:, 0:featur_len2] * a_trues2[:, featur_len2:featur_len2*2],
+    b_trues2[:, 0:featur_len2] * b_trues2[:, featur_len2*2:featur_len2*3],
+])
+false_sames2 = np.concatenate([
+    b_trues2[:, 0:featur_len2] * b_trues2[:, featur_len2:featur_len2*2],
+    a_trues2[:, 0:featur_len2] * a_trues2[:, featur_len2*2:featur_len2*3],
+    all_ngs2[:, 0:featur_len2] * all_ngs2[:, featur_len2:featur_len2*2],
+    all_ngs2[:, 0:featur_len2] * all_ngs2[:, featur_len2*2:featur_len2*3]
+])
+print("True label dependency same mean", np.absolute(true_sames2).sum(axis=1).mean())
+print("False label dependency same mean", np.absolute(false_sames2).sum(axis=1).mean())
+print("True label dependency same variance", np.absolute(true_sames2).sum(axis=1).var())
+print("False label dependency same variance", np.absolute(false_sames2).sum(axis=1).var())
+print("Count True label is same large case", (np.absolute(true_sames2).sum(axis=1) > np.absolute(false_sames2[:len(true_sames2)]).sum(axis=1)).sum(axis=0))
 
 vocabulary = {v: k for k, v in stanfordnlp_model.cv_position.vocabulary_.items()}
 true_feature_diffs = np.absolute(true_diffs).sum(axis=0)
