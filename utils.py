@@ -1,5 +1,5 @@
 import stanfordnlp
-nlp = stanfordnlp.Pipeline(use_gpu=False, processors='tokenize,lemma,pos')
+nlp = stanfordnlp.Pipeline(use_gpu=False, processors='tokenize,lemma,pos,depparse')
 
 
 BEGIN_OF_SENTENCE = "BOS"
