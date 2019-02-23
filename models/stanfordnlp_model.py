@@ -16,6 +16,7 @@ import xgboost as xgb
 dtype = np.int32
 DEFAULT_NGRAM_WINDOW = 2
 DEFAULT_WINDOW_SIZE = 10
+NONE_DEPENDENCY = 'NONE'
 
 DummyWord = namedtuple("DummyWord", "pos upos")
 cv_normal = CountVectorizer(dtype=dtype)
@@ -30,6 +31,10 @@ cv_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
 cv_upos_position = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
 cv_upos_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
     utils.UPOS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
+dependencies = ['governor', 'child']
+cv_dependencies = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
+cv_dependencies.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
+    utils.POS_TYPES + [NONE_DEPENDENCY], dependencies)])
 
 
 def _get_bag_of_pos(words, index, N, target_len=1):
@@ -155,6 +160,59 @@ def _get_bag_of_upos_with_position(words, index, N, target_len=1):
         words[index-N:index] + [words[index]] + words[index+target_len:index+target_len+N])]
 
 
+def _get_bag_of_pos_with_dependency(words, index):
+    """Return pos list surrounding index
+    Args:
+        words (list): stanfordnlp word list object having pos attributes.
+        index (int): target index
+    Return:
+        pos_list (List[str]): xpos format string list
+    """
+    pos_list = []
+
+    # add governor
+    governor_index = index + (int(words[index].governor) - int(words[index].index))
+    if governor_index < len(words):
+        governor = words[governor_index]
+        pos_list.append(governor.pos.replace('$', '') + '_governor')
+    else:
+        pos_list.append(NONE_DEPENDENCY + '_governor')
+        print(index)
+        print(words[index])
+        print(governor_index)
+        print(len(words))
+
+    # add child
+    roots = [(i, w) for i, w in enumerate(words) if w.dependency_relation == 'root']
+    start_index = 0
+    end_index = len(words)
+    for i, w in roots:
+        if i <= index:
+            start_index = i
+        else:
+            end_index = i - 1
+            break
+    for w in words[start_index:end_index]:
+        if int(w.governor) == int(words[index].index):
+            pos_list.append(w.pos.replace('$', '') + '_child')
+    return pos_list
+
+
+def _vectorise_bag_of_pos_with_dependency(words, indexes):
+    """Return pos list surrounding index
+    Args:
+        words (list): stanfordnlp word list object having pos attributes.
+        indexes (List[int]): target indexes
+    Return:
+        pos_list (List[str]): xpo format string list
+    """
+    matrixes = []
+    for i, index in enumerate(indexes):
+        poss = _get_bag_of_pos_with_dependency(words, index)
+        matrixes.append(" ".join(poss))
+    return cv_dependencies.transform(matrixes).toarray().flatten()
+
+
 def _get_classify_labels(df):
     """Return task classify label
 
@@ -228,17 +286,26 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     """
     data = _load_data(df, use_preprocessdata, save_path)
     X = []
+    X2 = []
     for i, (words, indexes) in enumerate(data):
         X.append(
             _vectorise_bag_of_pos_with_position(words, indexes, DEFAULT_WINDOW_SIZE,
                                                 targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
+        X2.append(_vectorise_bag_of_pos_with_dependency(words, indexes))
+
     X = np.array(X)
+    X2 = np.array(X2)
     featur_len = int(X.shape[1] / 3)
+    featur_len2 = int(X2.shape[1] / 3)
     X = np.concatenate((
         X[:, 0:featur_len] - X[:, featur_len:featur_len*2],
         X[:, 0:featur_len] - X[:, featur_len*2:featur_len*3],
         X[:, 0:featur_len] * X[:, featur_len:featur_len*2],
         X[:, 0:featur_len] * X[:, featur_len*2:featur_len*3],
+        X2[:, 0:featur_len2] - X2[:, featur_len2:featur_len2*2],
+        X2[:, 0:featur_len2] - X2[:, featur_len2*2:featur_len2*3],
+        X2[:, 0:featur_len2] * X2[:, featur_len2:featur_len2*2],
+        X2[:, 0:featur_len2] * X2[:, featur_len2*2:featur_len2*3],
         _get_sexial_labels(df),
         (df['Pronoun-offset'] - df['A-offset']).values.reshape(len(X), 1),
         (df['Pronoun-offset'] - df['B-offset']).values.reshape(len(X), 1)), axis=1)
@@ -292,7 +359,7 @@ def train(use_preprocessdata=True):
         study_name='gap-conf-kaggle',
         pruner=optuna.pruners.MedianPruner(),
         sampler=optuna.samplers.TPESampler(seed=0))
-    study.optimize(objective, n_trials=1000, n_jobs=-1)
+    study.optimize(objective, n_trials=100, n_jobs=-1)
     print("Best Params", study.best_params)
     print("Best Validation Value", study.best_value)
 
