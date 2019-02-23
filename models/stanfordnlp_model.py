@@ -31,7 +31,7 @@ cv_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
 cv_upos_position = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
 cv_upos_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
     utils.UPOS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
-dependencies = ['governor', 'child']
+dependencies = ['governor', 'child', 'ancestor', 'grandchild']
 cv_dependencies = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
 cv_dependencies.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
     utils.POS_TYPES + [NONE_DEPENDENCY], dependencies)])
@@ -170,31 +170,47 @@ def _get_bag_of_pos_with_dependency(words, index):
     """
     pos_list = []
 
+    def _get_governors(_index, name):
+        governor_list = []
+        governor_index = _index + (int(words[_index].governor) - int(words[_index].index))
+        if governor_index < len(words):
+            governor = words[governor_index]
+            governor_list.append(governor.pos.replace('$', '') + '_' + name)
+        else:
+            governor_list.append(NONE_DEPENDENCY + '_' + name)
+        return governor_index, governor_list
+
     # add governor
-    governor_index = index + (int(words[index].governor) - int(words[index].index))
-    if governor_index < len(words):
-        governor = words[governor_index]
-        pos_list.append(governor.pos.replace('$', '') + '_governor')
-    else:
-        pos_list.append(NONE_DEPENDENCY + '_governor')
-        print(index)
-        print(words[index])
-        print(governor_index)
-        print(len(words))
+    governor_index, governor_list = _get_governors(index, 'governor')
+    pos_list.extend(governor_list)
+    if governor_index < len(words) and int(words[governor_index].governor) != 0:
+        _, ancestor_list = _get_governors(governor_index, 'ancestor')
+        pos_list.extend(ancestor_list)
+
+    def _get_children(_index, name):
+        children = []
+        child_list = []
+        roots = [(i, w) for i, w in enumerate(words) if w.dependency_relation == 'root']
+        start_index = 0
+        end_index = len(words)
+        for i, w in roots:
+            if i <= _index:
+                start_index = i
+            else:
+                end_index = i - 1
+                break
+        for i, w in enumerate(words[start_index:end_index]):
+            if int(w.governor) == int(words[_index].index):
+                children.append(start_index + i)
+                child_list.append(w.pos.replace('$', '') + '_' + name)
+        return children, child_list
 
     # add child
-    roots = [(i, w) for i, w in enumerate(words) if w.dependency_relation == 'root']
-    start_index = 0
-    end_index = len(words)
-    for i, w in roots:
-        if i <= index:
-            start_index = i
-        else:
-            end_index = i - 1
-            break
-    for w in words[start_index:end_index]:
-        if int(w.governor) == int(words[index].index):
-            pos_list.append(w.pos.replace('$', '') + '_child')
+    children, child_list = _get_children(index, 'child')
+    pos_list.extend(child_list)
+    for i in children:
+        grandchildren, grandchild_list = _get_children(i, 'grandchild')
+        pos_list.extend(grandchild_list)
     return pos_list
 
 
@@ -372,7 +388,7 @@ def train(use_preprocessdata=True):
 
 
 def evaluate(test_data, use_preprocessdata=True):
-    train()
+    # train()
     X, Y = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
     with open('model.pkl', 'rb') as f:
         model = pickle.load(f)
