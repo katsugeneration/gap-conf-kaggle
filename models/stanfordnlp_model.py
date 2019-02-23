@@ -137,12 +137,13 @@ def _vectorise_bag_of_pos_with_position(words, indexes, N, targets=[]):
     return cv_position.transform(matrixes).toarray().flatten()
 
 
-def _get_bag_of_upos_with_position(words, index, N):
+def _get_bag_of_upos_with_position(words, index, N, target_len=1):
     """Return pos list surrounding index
     Args:
         words (list): stanfordnlp word list object having pos attributes.
         index (int): target index
         N (int): return +/- N word pos
+        target_len (int): target word length
     Return:
         pos_list (List[str]): upos format string list
     """
@@ -150,7 +151,8 @@ def _get_bag_of_upos_with_position(words, index, N):
     eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
     words = [bos] * N + words + [eos] * N
     index += N
-    return [w.upos.replace('$', '') + '_' + str(i-N) for i, w in enumerate(words[index-N:index+N+1])]
+    return [w.upos.replace('$', '') + '_' + str(i-N) for i, w in enumerate(
+        words[index-N:index] + [words[index]] + words[index+target_len:index+target_len+N])]
 
 
 def _get_classify_labels(df):
