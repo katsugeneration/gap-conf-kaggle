@@ -390,7 +390,9 @@ def train(use_preprocessdata=True):
     print("Best Validation Value", study.best_value)
 
     model = xgb.XGBClassifier(n_jobs=-1, random_state=0, **study.best_params)
-    model.fit(X, Y.flatten())
+    model.fit(
+        np.concatenate([X, validation_X]),
+        np.concatenate([Y, validation_Y]).flatten())
     with open('model.pkl', 'wb') as f:
         pickle.dump(model, f, protocol=pickle.HIGHEST_PROTOCOL)
     y_pred = model.predict(X)
