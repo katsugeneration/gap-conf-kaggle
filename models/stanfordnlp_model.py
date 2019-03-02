@@ -31,7 +31,7 @@ cv_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
 cv_upos_position = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
 cv_upos_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
     utils.UPOS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
-dependencies = ['governor', 'child', 'ancestor', 'grandchild']
+dependencies = ['governor', 'child', 'ancestor', 'grandchild', 'sibling', 'sibling_child']
 cv_dependencies = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
 cv_dependencies.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
     utils.POS_TYPES + [NONE_DEPENDENCY], dependencies)])
@@ -213,9 +213,16 @@ def _get_bag_of_pos_with_dependency(words, index):
             pos_list.extend(ancestor_list)
 
         # add sibling
-        children, child_list = _get_children(governor_index, 'sibling')
-        child_list.remove(words[index].pos.replace('$', '') + '_sibling')
-        pos_list.extend(child_list)
+        siblings, sibling_list = _get_children(governor_index, 'sibling')
+        i_index = siblings.index(index)
+        del sibling_list[i_index]
+        del siblings[i_index]
+        pos_list.extend(sibling_list)
+
+        # add sibling list
+        for i in siblings:
+            sibling_children, sibling_child_list = _get_children(i, 'sibling_child')
+            pos_list.extend(sibling_child_list)
 
     # add child
     children, child_list = _get_children(index, 'child')

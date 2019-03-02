@@ -126,8 +126,8 @@ def test_get_bag_of_pos_with_dependency_with_grandchild():
             "Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
             191, 'Cheryl')
     poss = stanfordnlp_model._get_bag_of_pos_with_dependency(words, index)
-    eq_(13, len(poss))
-    eq_(['VBD_governor', 'NNP_sibling', '._sibling', 'NNP_child', ',_child', 'NN_child', 'NN_child', 'NNP_grandchild', 'CC_grandchild', 'RB_grandchild', 'DT_grandchild', 'NN_grandchild', 'NN_grandchild'], poss)
+    eq_(14, len(poss))
+    eq_(['VBD_governor', 'NNP_sibling', '._sibling', 'NNP_sibling_child', 'NNP_child', ',_child', 'NN_child', 'NN_child', 'NNP_grandchild', 'CC_grandchild', 'RB_grandchild', 'DT_grandchild', 'NN_grandchild', 'NN_grandchild'], poss)
 
 
 def test_vectorise_bag_of_pos_with_dependency():
@@ -151,4 +151,4 @@ def test_vectorise_bag_of_pos_with_dependency_with_grandchild():
             "Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
             191, 'Cheryl')
     vectors = stanfordnlp_model._vectorise_bag_of_pos_with_dependency(words, [index, index])
-    eq_(22, np.sum(vectors))
+    eq_(28, np.sum(vectors))
