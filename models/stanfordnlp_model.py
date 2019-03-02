@@ -332,12 +332,14 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     X2_a = X2[:, featur_len2:featur_len2*2]
     X2_b = X2[:, featur_len2*2:featur_len2*3]
     X = np.concatenate((
+        X,
         X_pr - X_a,
         X_pr - X_b,
         X_pr * X_a,
         X_pr * X_b,
         np.absolute(X_pr - X_a).sum(axis=1, keepdims=True) - np.absolute(X_pr - X_b).sum(axis=1, keepdims=True),
         np.absolute(X_pr * X_a).sum(axis=1, keepdims=True) - np.absolute(X_pr * X_b).sum(axis=1, keepdims=True),
+        X2,
         X2_pr - X2_a,
         X2_pr - X2_b,
         X2_pr * X2_a,
@@ -397,7 +399,7 @@ def train(use_preprocessdata=True):
         study_name='gap-conf-kaggle',
         pruner=optuna.pruners.MedianPruner(),
         sampler=optuna.samplers.TPESampler(seed=0))
-    study.optimize(objective, n_trials=100, n_jobs=-1)
+    study.optimize(objective, n_trials=1000, n_jobs=-1)
     print("Best Params", study.best_params)
     print("Best Validation Value", study.best_value)
 
