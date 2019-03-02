@@ -38,7 +38,7 @@ def charpos_to_word_index(string, pos, target, words=None):
     index = len(words) - len(after_words)
     if words[index].text != target:
         for i in range(-2, 3):
-            if words[index+i].text == target:
+            if index+i < len(words) and words[index+i].text == target:
                 index = index+i
                 break
     return words, index
