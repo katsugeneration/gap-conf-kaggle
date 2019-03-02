@@ -172,6 +172,9 @@ def _get_bag_of_pos_with_dependency(words, index):
 
     def _get_governor(_index, name):
         governor_list = []
+        if int(words[_index].governor) == 0:
+            # case _index word has no governer
+            return -1, governor_list
         governor_index = _index + (int(words[_index].governor) - int(words[_index].index))
         if governor_index < len(words):
             governor = words[governor_index]
@@ -180,30 +183,39 @@ def _get_bag_of_pos_with_dependency(words, index):
             governor_list.append(NONE_DEPENDENCY + '_' + name)
         return governor_index, governor_list
 
-    # add governor
-    governor_index, governor_list = _get_governor(index, 'governor')
-    pos_list.extend(governor_list)
-    if governor_index < len(words) and int(words[governor_index].governor) != 0:
-        _, ancestor_list = _get_governor(governor_index, 'ancestor')
-        pos_list.extend(ancestor_list)
-
     def _get_children(_index, name):
         children = []
         child_list = []
-        roots = [(i, w) for i, w in enumerate(words) if w.dependency_relation == 'root']
+        roots = [(i, w) for i, w in enumerate(words) if int(w.index) == 1]
         start_index = 0
-        end_index = len(words)
+        end_index = len(words) - 1
         for i, w in roots:
             if i <= _index:
                 start_index = i
             else:
                 end_index = i - 1
                 break
-        for i, w in enumerate(words[start_index:end_index]):
+        for i, w in enumerate(words[start_index:end_index + 1]):
             if int(w.governor) == int(words[_index].index):
                 children.append(start_index + i)
                 child_list.append(w.pos.replace('$', '') + '_' + name)
         return children, child_list
+
+    # add governor
+    governor_index, governor_list = _get_governor(index, 'governor')
+    if 0 <= governor_index < len(words):
+        # case index word has a governer
+        pos_list.extend(governor_list)
+        if int(words[governor_index].governor) != 0:
+            # case _index word has a governer
+            # add ancestor
+            _, ancestor_list = _get_governor(governor_index, 'ancestor')
+            pos_list.extend(ancestor_list)
+
+        # add sibling
+        children, child_list = _get_children(governor_index, 'sibling')
+        child_list.remove(words[index].pos.replace('$', '') + '_sibling')
+        pos_list.extend(child_list)
 
     # add child
     children, child_list = _get_children(index, 'child')
