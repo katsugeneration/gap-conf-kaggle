@@ -14,11 +14,12 @@ CONTENT_DEPRELS = [
 ]
 
 
-def charpos_to_word_index(string, pos, words=None):
+def charpos_to_word_index(string, pos, target, words=None):
     """Convert character position to word index.
     Args:
         string (str): target sentence
         pos (int): word start position counted by character
+        target (stre): target word
     Return:
         words (word): stanfordnlp word object list parsed input string.
         word_index (int): responsible word index in all sentence.
@@ -34,7 +35,13 @@ def charpos_to_word_index(string, pos, words=None):
     for s in doc.sentences:
         after_words.extend(s.words)
 
-    return words, len(words) - len(after_words)
+    index = len(words) - len(after_words)
+    if words[index].text != target:
+        for i in range(-2, 3):
+            if words[index+i].text == target:
+                index = index+i
+                break
+    return words, index
 
 
 def get_same_word_index(string, word):

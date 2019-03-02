@@ -292,9 +292,9 @@ def _load_data(df, use_preprocessdata=False, save_path=None):
     if not use_preprocessdata:
         data = []
         for i in range(len(df)):
-            words, pronnoun_index = utils.charpos_to_word_index(df['Text'][i], df['Pronoun-offset'][i])
-            _, A_index = utils.charpos_to_word_index(df['Text'][i], df['A-offset'][i], words=words)
-            _, B_index = utils.charpos_to_word_index(df['Text'][i], df['B-offset'][i], words=words)
+            words, pronnoun_index = utils.charpos_to_word_index(df['Text'][i], df['Pronoun-offset'][i], df['Pronoun'][i])
+            _, A_index = utils.charpos_to_word_index(df['Text'][i], df['A-offset'][i], df['A'][i], words=words)
+            _, B_index = utils.charpos_to_word_index(df['Text'][i], df['B-offset'][i], df['B'][i], words=words)
             data.append((words, [pronnoun_index, A_index, B_index]))
         with open(save_path, 'wb') as f:
             pickle.dump(data, f, protocol=pickle.HIGHEST_PROTOCOL)
