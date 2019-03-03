@@ -134,8 +134,8 @@ def calculate_rate(y_pred):
     y_pred_B = y_pred[length:]
 
     result = np.concatenate([
-        (y_pred_A * (1 - y_pred_B)).reshape(length, 1),
-        ((1 - y_pred_A) * y_pred_B).reshape(length, 1),
+        (y_pred_A).reshape(length, 1),
+        (y_pred_B).reshape(length, 1),
         ((1 - y_pred_A) * (1 - y_pred_B)).reshape(length, 1),
     ], axis=1)
     result /= np.sum(result, axis=1, keepdims=1)
