@@ -94,6 +94,8 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     X2_a = X2[:, featur_len2:featur_len2*2]
     X2_b = X2[:, featur_len2*2:featur_len2*3]
     X_A = np.concatenate((
+        X_pr,
+        X_a,
         X_pr - X_a,
         X_pr * X_a,
         X2_pr - X2_a,
@@ -101,6 +103,8 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
         stanfordnlp_model._get_sexial_labels(df),
         (df['Pronoun-offset'] - df['A-offset']).values.reshape(len(X), 1)), axis=1)
     X_B = np.concatenate((
+        X_pr,
+        X_b,
         X_pr - X_b,
         X_pr * X_b,
         X2_pr - X2_b,
