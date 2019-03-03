@@ -280,6 +280,22 @@ def _get_sexial_labels(df):
     return labels
 
 
+def _get_dependency_labels(words, indexes):
+    """Return dependency parser features
+
+    Args:
+        words (list): stanfordnlp word list object having pos attributes.
+        indexes (List[int]): target indexes
+    Return:
+        feature_list (List[int]): features list. shape is (2, 1)
+    """
+    feature_list = [
+        words[indexes[0]].dependency_relation == words[indexes[1]].dependency_relation,
+        words[indexes[0]].dependency_relation == words[indexes[2]].dependency_relation
+    ]
+    return feature_list
+
+
 def _load_data(df, use_preprocessdata=False, save_path=None):
     """Load preprocess task speccific data.
     Args:
@@ -322,11 +338,13 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     data = _load_data(df, use_preprocessdata, save_path)
     X = []
     X2 = []
+    X3 = []
     for i, (words, indexes) in enumerate(data):
         X.append(
             _vectorise_bag_of_pos_with_position(words, indexes, DEFAULT_WINDOW_SIZE,
                                                 targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
         X2.append(_vectorise_bag_of_pos_with_dependency(words, indexes))
+        X3.append(_get_dependency_labels(words, indexes))
 
     X = np.array(X)
     X2 = np.array(X2)
@@ -352,6 +370,7 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
         np.sum(np.absolute(X2_pr - X2_a), axis=1, keepdims=True) - np.absolute(X2_pr - X2_b).sum(axis=1, keepdims=True),
         np.absolute(X2_pr * X2_a).sum(axis=1, keepdims=True) - np.absolute(X2_pr * X2_b).sum(axis=1, keepdims=True),
         _get_sexial_labels(df),
+        X3,
         (df['Pronoun-offset'] - df['A-offset']).values.reshape(len(X), 1),
         (df['Pronoun-offset'] - df['B-offset']).values.reshape(len(X), 1)), axis=1)
     Y = _get_classify_labels(df)
