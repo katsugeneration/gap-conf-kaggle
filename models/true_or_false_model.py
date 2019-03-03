@@ -214,8 +214,26 @@ def evaluate(test_data, use_preprocessdata=True):
     Y_labels = stanfordnlp_model._get_classify_labels(test_data)
     with open('model.pkl', 'rb') as f:
         model = pickle.load(f)
-    y_pred = calculate_rate(model.predict_proba(X))
+    pred = model.predict_proba(X)
+    y_pred = calculate_rate(pred)
     print("Test Accuracy:", accuracy_score(Y_labels, np.argmax(y_pred, axis=1)))
+    a = (Y_labels.flatten()[:20] != np.argmax(y_pred[:20], axis=1))
+    print("Error Case", Y_labels[:20][a])
+    print("Error Case Label", np.argmax(y_pred[:20][a], axis=1))
+    print("Error Case Rate", y_pred[:20][a])
+    print("A predictions", pred[:20][a])
+    print("B predictions", pred[int(len(pred)/2):int(len(pred)/2)+20][a])
+
+    data = _load_data(test_data, True, 'preprocess_testdata.pkl')
+    for i, (words, indexes) in enumerate(data):
+        if i in np.where(a == True)[0]:
+            print("Index", i)
+            print("Pronounce position", stanfordnlp_model._get_bag_of_pos_with_position(words, indexes[0], DEFAULT_WINDOW_SIZE, target_len=len(test_data['Pronoun'][i].split())))
+            print("A position", stanfordnlp_model._get_bag_of_pos_with_position(words, indexes[1], DEFAULT_WINDOW_SIZE, target_len=len(test_data['A'][i].split())))
+            print("B position", stanfordnlp_model._get_bag_of_pos_with_position(words, indexes[2], DEFAULT_WINDOW_SIZE, target_len=len(test_data['B'][i].split())))
+            print("Pronounce dependency", stanfordnlp_model._get_bag_of_pos_with_dependency(words, indexes[0]))
+            print("A dependency", stanfordnlp_model._get_bag_of_pos_with_dependency(words, indexes[1]))
+            print("B dependency", stanfordnlp_model._get_bag_of_pos_with_dependency(words, indexes[2]))
 
     predicts = calculate_rate(model.predict_proba(X))
     out_df = pandas.DataFrame(data=predicts, columns=['A', 'B', 'NEITHER'])
