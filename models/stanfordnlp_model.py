@@ -425,8 +425,23 @@ def evaluate(test_data, use_preprocessdata=True):
         model = pickle.load(f)
     y_pred = model.predict(X)
     print("Test Accuracy:", accuracy_score(Y, y_pred))
-
     predicts = model.predict_proba(X)
+    a = (Y.flatten()[:20] != np.argmax(predicts[:20], axis=1))
+    print("Error Case", Y[:20][a])
+    print("Error Case Label", np.argmax(predicts[:20][a], axis=1))
+    print("Error Case Rate", predicts[:20][a])
+
+    data = _load_data(test_data, True, 'preprocess_testdata.pkl')
+    for i, (words, indexes) in enumerate(data):
+        if i in np.where(a == True)[0]:
+            print("Index", i)
+            print("Pronounce position", _get_bag_of_pos_with_position(words, indexes[0], DEFAULT_WINDOW_SIZE, target_len=len(test_data['Pronoun'][i].split())))
+            print("A position", _get_bag_of_pos_with_position(words, indexes[1], DEFAULT_WINDOW_SIZE, target_len=len(test_data['A'][i].split())))
+            print("B position", _get_bag_of_pos_with_position(words, indexes[2], DEFAULT_WINDOW_SIZE, target_len=len(test_data['B'][i].split())))
+            print("Pronounce dependency", _get_bag_of_pos_with_dependency(words, indexes[0]))
+            print("A dependency", _get_bag_of_pos_with_dependency(words, indexes[1]))
+            print("B dependency", _get_bag_of_pos_with_dependency(words, indexes[2]))
+
     out_df = pandas.DataFrame(data=predicts, columns=['A', 'B', 'NEITHER'])
     out_df['ID'] = test_data['ID']
     return out_df
