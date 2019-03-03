@@ -12,6 +12,7 @@ CONTENT_DEPRELS = [
     "nummod", "acl", "amod", "conj", "fixed", "flat", "compound", "list",
     "parataxis", "orphan", "goeswith", "reparandum", "root", "dep"
 ]
+CONTENT_DEPRELS = ["acl", "advcl", "advmod", "amod", "appos", "aux", "case", "cc", "ccomp", "clf", "compound", "conj", "cop", "csubj", "dep", "det", "discourse", "dislocated", "expl", "fixed", "flat", "goeswith", "iobj", "list", "mark", "nmod", "nsubj", "nummod", "obj", "obl", "orphan", "parataxis", "punct", "reparandum", "root", "vocative", "xcomp"]
 
 
 def charpos_to_word_index(string, pos, target, words=None):
