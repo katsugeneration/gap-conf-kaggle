@@ -96,6 +96,8 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     X_A = np.concatenate((
         X_pr,
         X_a,
+        X2_pr,
+        X2_a,
         X_pr - X_a,
         X_pr * X_a,
         X2_pr - X2_a,
@@ -105,6 +107,8 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     X_B = np.concatenate((
         X_pr,
         X_b,
+        X2_pr,
+        X2_b,
         X_pr - X_b,
         X_pr * X_b,
         X2_pr - X2_b,
