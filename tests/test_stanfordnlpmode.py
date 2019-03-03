@@ -11,7 +11,7 @@ def test_get_bag_of_pos():
             274, 'her')
     poss = stanfordnlp_model._get_bag_of_pos(words, index, 5)
     eq_(11, len(poss))
-    eq_([w.pos.replace('$', '') for w in words[index-5:index+6]], poss)
+    eq_([stanfordnlp_model._get_word_feature(w) for w in words[index-5:index+6]], poss)
 
 
 def test_get_bag_of_pos_len2():
@@ -20,7 +20,7 @@ def test_get_bag_of_pos_len2():
             274, 'her')
     poss = stanfordnlp_model._get_bag_of_pos(words, index, 5, target_len=2)
     eq_(11, len(poss))
-    eq_([w.pos.replace('$', '') for w in words[index-5:index] + [words[index]] + words[index+2:index+7]], poss)
+    eq_([stanfordnlp_model._get_word_feature(w) for w in words[index-5:index] + [words[index]] + words[index+2:index+7]], poss)
 
 
 def test_get_bag_of_pos_case_start_0():
@@ -76,7 +76,7 @@ def test_get_bag_of_pos_with_position():
             274, 'her')
     poss = stanfordnlp_model._get_bag_of_pos_with_position(words, index, 5)
     eq_(11, len(poss))
-    eq_([w.pos.replace('$', '')  + '_' + str(i-5) for i, w in enumerate(words[index-5:index+6])], poss)
+    eq_([stanfordnlp_model._get_word_feature(w)  + '_' + str(i-5) for i, w in enumerate(words[index-5:index+6])], poss)
 
 
 def test_get_bag_of_pos_with_position_len2():
@@ -85,7 +85,7 @@ def test_get_bag_of_pos_with_position_len2():
             274, 'her')
     poss = stanfordnlp_model._get_bag_of_pos_with_position(words, index, 5, target_len=2)
     eq_(11, len(poss))
-    eq_([w.pos.replace('$', '')  + '_' + str(i-5) for i, w in enumerate(words[index-5:index] + [words[index]] + words[index+2:index+7])], poss)
+    eq_([stanfordnlp_model._get_word_feature(w)  + '_' + str(i-5) for i, w in enumerate(words[index-5:index] + [words[index]] + words[index+2:index+7])], poss)
 
 
 def test_vectorise_bag_of_pos_with_position():

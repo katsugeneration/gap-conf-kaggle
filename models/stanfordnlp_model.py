@@ -25,7 +25,7 @@ elif FEATURE_TYPE == 'DEPENDENCY':
     FEATURES = utils.CONTENT_DEPRELS
 
 
-DummyWord = namedtuple("DummyWord", "pos upos")
+DummyWord = namedtuple("DummyWord", "pos upos dependency_relation")
 cv_normal = CountVectorizer(dtype=dtype)
 cv_normal.fit(FEATURES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE])
 cv_ngram = CountVectorizer(dtype=dtype)
@@ -63,8 +63,8 @@ def _get_bag_of_pos(words, index, N, target_len=1):
     Return:
         pos_list (List[str]): xpo format string list
     """
-    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE)
-    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
+    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE, dependency_relation=utils.BEGIN_OF_SENTENCE)
+    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE, dependency_relation=utils.END_OF_SENTENCE)
     words = [bos] * N + words + [eos] * N
     index += N
     return [_get_word_feature(w) for w in words[index-N:index] + [words[index]] + words[index+target_len:index+target_len+N]]
@@ -97,8 +97,8 @@ def _get_bag_of_pos_ngram(words, index, window_size, N):
     Return:
         pos_list (List[str]): xpo format string list
     """
-    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE)
-    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
+    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE, dependency_relation=utils.BEGIN_OF_SENTENCE)
+    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE, dependency_relation=utils.END_OF_SENTENCE)
     words = [bos] * (window_size + N) + words + [eos] * (window_size + N)
     index += (window_size + N)
     return [
@@ -133,8 +133,8 @@ def _get_bag_of_pos_with_position(words, index, N, target_len=1):
     Return:
         pos_list (List[str]): xpo format string list
     """
-    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE)
-    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
+    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE, dependency_relation=utils.BEGIN_OF_SENTENCE)
+    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE, dependency_relation=utils.END_OF_SENTENCE)
     words = [bos] * N + words + [eos] * N
     index += N
     return [_get_word_feature(w) + '_' + str(i-N) for i, w in enumerate(
@@ -168,8 +168,8 @@ def _get_bag_of_upos_with_position(words, index, N, target_len=1):
     Return:
         pos_list (List[str]): upos format string list
     """
-    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE)
-    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
+    bos = DummyWord(pos=utils.BEGIN_OF_SENTENCE, upos=utils.BEGIN_OF_SENTENCE, dependency_relation=utils.BEGIN_OF_SENTENCE)
+    eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE, dependency_relation=utils.END_OF_SENTENCE)
     words = [bos] * N + words + [eos] * N
     index += N
     return [w.upos.replace('$', '') + '_' + str(i-N) for i, w in enumerate(
@@ -194,7 +194,7 @@ def _get_bag_of_pos_with_dependency(words, index):
         governor_index = _index + (int(words[_index].governor) - int(words[_index].index))
         if governor_index < len(words):
             governor = words[governor_index]
-            governor_list.append(governor.pos.replace('$', '') + '_' + name)
+            governor_list.append(_get_word_feature(governor) + '_' + name)
         else:
             governor_list.append(NONE_DEPENDENCY + '_' + name)
         return governor_index, governor_list
