@@ -312,6 +312,29 @@ def _get_dependency_labels(words, indexes):
     return feature_list
 
 
+def _get_same_sentence_features(words, indexes):
+    """Return in same setence feature flags
+
+    Args:
+        words (list): stanfordnlp word list object having pos attributes.
+        indexes (List[int]): target indexes
+    Return:
+        feature_list (List[int]): features list. shape is (2, 1)
+    """
+    roots = [(i, w) for i, w in enumerate(words) if int(w.index) == 1]
+    points = [0, 0, 0]
+    for i, w in roots:
+        for j in range(len(indexes)):
+            if i <= indexes[j]:
+                points[0] += 1
+    feature_list = [
+        points[0] == points[1],
+        points[0] == points[2],
+        points[1] == points[2],
+    ]
+    return feature_list
+
+
 def _load_data(df, use_preprocessdata=False, save_path=None):
     """Load preprocess task speccific data.
     Args:
