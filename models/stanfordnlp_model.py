@@ -17,24 +17,40 @@ dtype = np.int32
 DEFAULT_NGRAM_WINDOW = 2
 DEFAULT_WINDOW_SIZE = 10
 NONE_DEPENDENCY = 'NONE'
+FEATURE_TYPE = 'XPOS'
+FEATURES = utils.POS_TYPES
+if FEATURE_TYPE == 'UPOS':
+    FEATURES = utils.UPOS_TYPES
+elif FEATURE_TYPE == 'DEPENDENCY':
+    FEATURES = utils.CONTENT_DEPRELS
+
 
 DummyWord = namedtuple("DummyWord", "pos upos")
 cv_normal = CountVectorizer(dtype=dtype)
-cv_normal.fit(utils.POS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE])
+cv_normal.fit(FEATURES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE])
 cv_ngram = CountVectorizer(dtype=dtype)
 cv_ngram.fit(["_".join(p) for p in itertools.product(
-    utils.POS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE],
+    FEATURES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE],
     repeat=DEFAULT_NGRAM_WINDOW)])
 cv_position = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
 cv_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
-    utils.POS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
+    FEATURES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
 cv_upos_position = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
 cv_upos_position.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
     utils.UPOS_TYPES + [utils.BEGIN_OF_SENTENCE, utils.END_OF_SENTENCE], range(-DEFAULT_WINDOW_SIZE, DEFAULT_WINDOW_SIZE+1))])
 dependencies = ['governor', 'child', 'ancestor', 'grandchild', 'sibling', 'sibling_child']
 cv_dependencies = CountVectorizer(token_pattern=r'\b[-\w][-\w]+\b', dtype=dtype)
 cv_dependencies.fit([p[0] + "_" + str(p[1]) for p in itertools.product(
-    utils.POS_TYPES + [NONE_DEPENDENCY], dependencies)])
+    FEATURES + [NONE_DEPENDENCY], dependencies)])
+
+
+def _get_word_feature(w):
+    if FEATURE_TYPE == 'XPOS':
+        return w.pos.replace('$', '')
+    elif FEATURE_TYPE == 'UPOS':
+        return w.upos
+    elif FEATURE_TYPE == 'DEPENDENCY':
+        return w.dependency_relation.split(':')[0]
 
 
 def _get_bag_of_pos(words, index, N, target_len=1):
@@ -51,7 +67,7 @@ def _get_bag_of_pos(words, index, N, target_len=1):
     eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
     words = [bos] * N + words + [eos] * N
     index += N
-    return [w.pos.replace('$', '') for w in words[index-N:index] + [words[index]] + words[index+target_len:index+target_len+N]]
+    return [_get_word_feature(w) for w in words[index-N:index] + [words[index]] + words[index+target_len:index+target_len+N]]
 
 
 def _vectorise_bag_of_pos(words, indexes, N, targets=[]):
@@ -86,7 +102,7 @@ def _get_bag_of_pos_ngram(words, index, window_size, N):
     words = [bos] * (window_size + N) + words + [eos] * (window_size + N)
     index += (window_size + N)
     return [
-        "_".join([w.pos.replace('$', '') for w in words[i:i+N]])
+        "_".join([_get_word_feature(w) for w in words[i:i+N]])
         for i in range(index-window_size, index+window_size+1)]
 
 
@@ -121,7 +137,7 @@ def _get_bag_of_pos_with_position(words, index, N, target_len=1):
     eos = DummyWord(pos=utils.END_OF_SENTENCE, upos=utils.END_OF_SENTENCE)
     words = [bos] * N + words + [eos] * N
     index += N
-    return [w.pos.replace('$', '') + '_' + str(i-N) for i, w in enumerate(
+    return [_get_word_feature(w) + '_' + str(i-N) for i, w in enumerate(
         words[index-N:index] + [words[index]] + words[index+target_len:index+target_len+N])]
 
 
@@ -198,7 +214,7 @@ def _get_bag_of_pos_with_dependency(words, index):
         for i, w in enumerate(words[start_index:end_index + 1]):
             if int(w.governor) == int(words[_index].index):
                 children.append(start_index + i)
-                child_list.append(w.pos.replace('$', '') + '_' + name)
+                child_list.append(_get_word_feature(w) + '_' + name)
         return children, child_list
 
     # add governor
