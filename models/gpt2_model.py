@@ -2,10 +2,13 @@
 # Copyright 2019 Katsuya Shimabukuro.
 
 import os
+import re
 import json
+import pandas
 import numpy as np
 import tensorflow as tf
 import importlib.util
+from models import stanfordnlp_model
 
 # Load Open AI GPT-2 module
 gpt2_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "gpt-2")
@@ -65,5 +68,49 @@ def predict(text):
     return [(enc.decode(o).strip(), p) for o, p in zip(words, probabilities[0])]
 
 
-def evaluate(test_data):
-    predict()
+def _get_scope_sentence(words, indexes):
+    roots = [(i, w) for i, w in enumerate(words) if int(w.index) == 1]
+    start_index = 0
+    end_index = len(words) - 1
+    for i, w in roots:
+        if (i <= indexes).all():
+            start_index = i
+        elif (i >= indexes).all():
+            end_index = i - 1
+            break
+    sentence = " ".join([w.text for w in words[start_index:end_index+1]])
+    sentence = re.sub(r" (\W)", r"\1", sentence)
+    sentence = re.sub(r" n't", r"n't", sentence)
+    return sentence
+
+
+def calcurate_likelihood(words, indexes):
+    woman = ["she", "her"]
+    sentence = _get_scope_sentence(words, np.array(indexes))
+    gender = "her" if words[indexes[0]].text.lower() in woman else "his"
+    predicts = predict(sentence + "\nQ: What's " + gender + " name?\nA:")
+
+    A_rate = 0.00
+    B_rate = 0.00
+
+    for pairs in reversed(predicts):
+        if words[indexes[1]].text.startswith(pairs[0]):
+            A_rate = pairs[1]
+        if words[indexes[2]].text.startswith(pairs[0]):
+            B_rate = pairs[1]
+
+    if A_rate == 0.0 and B_rate == 0.0:
+        return np.array([0.3333, 0.3333, 0.3333], np.float32)
+    else:
+        return np.array([A_rate, B_rate, 0], np.float32)
+
+
+def evaluate(test_data, use_preprocessdata=True):
+    build()
+    data = stanfordnlp_model._load_data(test_data, use_preprocessdata, 'preprocess_testdata.pkl')
+    predicts = np.ndarray([len(test_data), 3], dtype=np.float32)
+    for i, (words, indexes) in enumerate(data):
+        predicts[i] = calcurate_likelihood(words, indexes)
+    out_df = pandas.DataFrame(data=predicts, columns=['A', 'B', 'NEITHER'])
+    out_df['ID'] = test_data['ID']
+    return out_df
