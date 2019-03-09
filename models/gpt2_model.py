@@ -42,9 +42,9 @@ def build():
     context = tf.placeholder(tf.int32, [1, None])
     lm_output = model.model(hparams=hparams, X=context, past=None, reuse=tf.AUTO_REUSE)
     logits = lm_output['logits'][:, :, :hparams.n_vocab]
-    values, indices = tf.nn.top_k(logits[:, -1, :], k=10)
+    values, indices = tf.nn.top_k(logits[:, -1, :], k=15)
     rates = tf.math.softmax(values)
-    indices = tf.reshape(indices, [10, 1])
+    indices = tf.reshape(indices, [15, 1])
 
     sess = tf.Session()
     saver = tf.train.Saver()
@@ -122,7 +122,7 @@ def calcurate_likelihood(words, indexes, y):
         rates = np.array([A_rate, B_rate, 0], np.float32)
     if y != np.argmax(rates):
         import random
-        if random.random() < 0.01:
+        if random.random() < 0.1:
             print("predicts", predicts)
             print("sentence", sentence)
             print("A", words[indexes[1]])
@@ -133,9 +133,13 @@ def calcurate_likelihood(words, indexes, y):
 
 def evaluate(test_data, use_preprocessdata=True):
     build()
-    data = stanfordnlp_model._load_data(test_data, use_preprocessdata, 'preprocess_testdata.pkl')
-    Y = stanfordnlp_model._get_classify_labels(test_data)
-    predicts = np.ndarray([len(test_data), 3], dtype=np.float32)
+    validation_df = pandas.read_csv('dataset/gap-validation.tsv', sep='\t')
+    data = stanfordnlp_model._load_data(validation_df, use_preprocessdata, 'preprocess_valdata.pkl')
+    Y = stanfordnlp_model._get_classify_labels(validation_df)
+    predicts = np.ndarray([len(validation_df), 3], dtype=np.float32)
+    # data = stanfordnlp_model._load_data(test_data, use_preprocessdata, 'preprocess_testdata.pkl')
+    # Y = stanfordnlp_model._get_classify_labels(test_data)
+    # predicts = np.ndarray([len(test_data), 3], dtype=np.float32)
     for i, (words, indexes) in enumerate(data):
         predicts[i] = calcurate_likelihood(words, indexes, Y[i])
 
