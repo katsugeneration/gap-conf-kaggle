@@ -21,12 +21,14 @@ sess = None
 enc = encoder.get_encoder(model_name)
 targets = None
 context = None
+rates = None
 
 
 def build():
     """Build model."""
     global sess
     global targets
+    global rates
     global context
 
     hparams = model.default_hparams()
@@ -37,6 +39,7 @@ def build():
     lm_output = model.model(hparams=hparams, X=context, past=None, reuse=tf.AUTO_REUSE)
     logits = lm_output['logits'][:, :, :hparams.n_vocab]
     values, indices = tf.nn.top_k(logits[:, -1, :], k=10)
+    rates = tf.math.softmax(values)
     indices = tf.reshape(indices, [10, 1])
 
     sess = tf.Session()
@@ -45,6 +48,7 @@ def build():
     saver.restore(sess, ckpt)
 
     targets = indices
+    rates = rates
     context = context
 
 
@@ -54,11 +58,11 @@ def predict(text):
     Args:
         text (str): input text for predction
     Return:
-        predictions (List[str]): preidcted word list.
+        predictions (List[Tuple[str, int]]): preidcted word and probability list.
     """
-    context_tokens = enc.encode("Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.\nQ: What's her name?\nA:")
-    out = sess.run(targets, {context: [context_tokens]})
-    return [enc.decode(o).strip() for o in out]
+    context_tokens = enc.encode(text)
+    words, probabilities = sess.run([targets, rates], {context: [context_tokens]})
+    return [(enc.decode(o).strip(), p) for o, p in zip(words, probabilities[0])]
 
 
 def evaluate(test_data):
