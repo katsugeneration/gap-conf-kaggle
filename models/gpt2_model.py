@@ -42,9 +42,9 @@ def build():
     context = tf.placeholder(tf.int32, [1, None])
     lm_output = model.model(hparams=hparams, X=context, past=None, reuse=tf.AUTO_REUSE)
     logits = lm_output['logits'][:, :, :hparams.n_vocab]
-    values, indices = tf.nn.top_k(logits[:, -1, :], k=15)
+    values, indices = tf.nn.top_k(logits[:, -1, :], k=10)
     rates = tf.math.softmax(values)
-    indices = tf.reshape(indices, [15, 1])
+    indices = tf.reshape(indices, [10, 1])
 
     sess = tf.Session()
     saver = tf.train.Saver()
@@ -111,23 +111,53 @@ def calcurate_likelihood(words, indexes, y):
     B_rate = 0.00
 
     for pairs in reversed(predicts):
-        if words[indexes[1]].text.startswith(pairs[0]):
+        if words[indexes[1]].text.startswith(pairs[0]) and pairs[1] >= 0.2:
             A_rate = pairs[1]
-        if words[indexes[2]].text.startswith(pairs[0]):
+        if words[indexes[2]].text.startswith(pairs[0]) and pairs[1] >= 0.2:
             B_rate = pairs[1]
 
     if A_rate == 0.0 and B_rate == 0.0:
         rates = np.array([0.2, 0.2, 0.6], np.float32)
     else:
         rates = np.array([A_rate, B_rate, 0], np.float32)
-    if y != np.argmax(rates):
-        import random
-        if random.random() < 0.1:
-            print("predicts", predicts)
-            print("sentence", sentence)
-            print("A", words[indexes[1]])
-            print("B", words[indexes[2]])
-            print()
+    return rates / np.sum(rates)
+
+
+def _get_governor(words, index):
+    governor_list = []
+    if int(words[index].governor) == 0:
+        # case index word has no governer
+        return -1, governor_list
+    governor_index = index + (int(words[index].governor) - int(words[index].index))
+    if governor_index < len(words):
+        governor = words[governor_index]
+        return stanfordnlp_model._get_word_feature(governor)
+    else:
+        return stanfordnlp_model.NONE_DEPENDENCY
+
+
+def calculate_syntax_likelihood(words, indexes):
+    """Return choice likelihoods
+
+    Args:
+        words (List[Words]): stanfordnlp word object list.
+        indexes (List[int]): target index list. format is [Pronoun, A, B]
+    Return:
+        rates (List[float]): selection likelihood. [A, B, NEITHER]
+    """
+    pronounce_dependency_relation = words[indexes[0]].dependency_relation
+    A_dependency_relation = words[indexes[1]].dependency_relation
+    B_dependency_relation = words[indexes[2]].dependency_relation
+    pronounce_governor = _get_governor(words, indexes[0])
+    A_governor = _get_governor(words, indexes[1])
+    B_governor = _get_governor(words, indexes[2])
+
+    if pronounce_dependency_relation == A_dependency_relation and pronounce_governor == A_governor:
+        rates = np.array([1.0, 0.0, 0.0], np.float32)
+    elif pronounce_dependency_relation == B_dependency_relation and pronounce_governor == B_governor:
+        rates = np.array([0.0, 1.0, 0.0], np.float32)
+    else:
+        rates = np.array([0.2, 0.2, 0.6], np.float32)
     return rates / np.sum(rates)
 
 
@@ -141,15 +171,23 @@ def evaluate(test_data, use_preprocessdata=True):
     # Y = stanfordnlp_model._get_classify_labels(test_data)
     # predicts = np.ndarray([len(test_data), 3], dtype=np.float32)
     for i, (words, indexes) in enumerate(data):
+        # predicts[i] = calculate_syntax_likelihood(words, indexes)
         predicts[i] = calcurate_likelihood(words, indexes, Y[i])
+        if np.argmax(predicts[i]) == 2:
+            predicts[i] = calculate_syntax_likelihood(words, indexes)
+            # predicts[i] = calcurate_likelihood(words, indexes, Y[i])
 
     print("A predict", sum(np.argmax(predicts, axis=1) == 0))
     print("B predict", sum(np.argmax(predicts, axis=1) == 1))
     print("Non predict", sum(np.argmax(predicts, axis=1) == 2))
     print("Test Accuracy:", accuracy_score(Y, np.argmax(predicts, axis=1)))
 
+    non_neithers = (2 != np.argmax(predicts, axis=1))
+    print("Non Neithers Test Accuracy:", accuracy_score(Y[non_neithers], np.argmax(predicts[non_neithers], axis=1)))
+
     corrects = (Y.flatten() == np.argmax(predicts, axis=1))
     print("Correct loss", log_loss(Y[corrects], predicts[corrects]))
+    print("Loss", log_loss(Y, predicts))
 
     out_df = pandas.DataFrame(data=predicts, columns=['A', 'B', 'NEITHER'])
     out_df['ID'] = test_data['ID']
