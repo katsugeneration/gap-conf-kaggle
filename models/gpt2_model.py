@@ -24,6 +24,7 @@ context = None
 
 
 def build():
+    """Build model."""
     global sess
     global targets
     global context
@@ -48,6 +49,13 @@ def build():
 
 
 def predict(text):
+    """Predict next word.
+
+    Args:
+        text (str): input text for predction
+    Return:
+        predictions (List[str]): preidcted word list.
+    """
     context_tokens = enc.encode("Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.\nQ: What's her name?\nA:")
     out = sess.run(targets, {context: [context_tokens]})
     return [enc.decode(o).strip() for o in out]
