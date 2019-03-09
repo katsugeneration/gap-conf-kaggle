@@ -8,6 +8,7 @@ import pandas
 import numpy as np
 import tensorflow as tf
 import importlib.util
+from sklearn.metrics import accuracy_score
 from models import stanfordnlp_model
 
 # Load Open AI GPT-2 module
@@ -100,9 +101,10 @@ def calcurate_likelihood(words, indexes):
             B_rate = pairs[1]
 
     if A_rate == 0.0 and B_rate == 0.0:
-        return np.array([0.3333, 0.3333, 0.3333], np.float32)
+        return np.array([0.2, 0.2, 0.6], np.float32)
     else:
-        return np.array([A_rate, B_rate, 0], np.float32)
+        rates = np.array([A_rate, B_rate, 0], np.float32)
+        return rates / np.sum(rates)
 
 
 def evaluate(test_data, use_preprocessdata=True):
@@ -111,6 +113,13 @@ def evaluate(test_data, use_preprocessdata=True):
     predicts = np.ndarray([len(test_data), 3], dtype=np.float32)
     for i, (words, indexes) in enumerate(data):
         predicts[i] = calcurate_likelihood(words, indexes)
+
+    Y = stanfordnlp_model._get_classify_labels(test_data)
+    print("A predict", sum(np.argmax(predicts, axis=1) == 0))
+    print("B predict", sum(np.argmax(predicts, axis=1) == 1))
+    print("Non predict", sum(np.argmax(predicts, axis=1) == 2))
+    print("Test Accuracy:", accuracy_score(Y, np.argmax(predicts, axis=1)))
+
     out_df = pandas.DataFrame(data=predicts, columns=['A', 'B', 'NEITHER'])
     out_df['ID'] = test_data['ID']
     return out_df
