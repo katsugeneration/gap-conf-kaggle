@@ -8,7 +8,7 @@ import pandas
 import numpy as np
 import tensorflow as tf
 import importlib.util
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, log_loss
 from models import stanfordnlp_model
 
 # Load Open AI GPT-2 module
@@ -70,6 +70,14 @@ def predict(text):
 
 
 def _get_scope_sentence(words, indexes):
+    """Return target sentence
+
+    Args:
+        words (List[Words]): stanfordnlp word object list.
+        indexe (List[int]): target index list. format is [Pronoun, A, B]
+    Return:
+        sentence (str): target word contains sentence.
+    """
     roots = [(i, w) for i, w in enumerate(words) if int(w.index) == 1]
     start_index = 0
     end_index = len(words) - 1
@@ -85,7 +93,15 @@ def _get_scope_sentence(words, indexes):
     return sentence
 
 
-def calcurate_likelihood(words, indexes):
+def calcurate_likelihood(words, indexes, y):
+    """Return choice likelihoods
+
+    Args:
+        words (List[Words]): stanfordnlp word object list.
+        indexe (List[int]): target index list. format is [Pronoun, A, B]
+    Return:
+        rates (List[float]): selection likelihood. [A, B, NEITHER]
+    """
     woman = ["she", "her"]
     sentence = _get_scope_sentence(words, np.array(indexes))
     gender = "her" if words[indexes[0]].text.lower() in woman else "his"
@@ -101,24 +117,35 @@ def calcurate_likelihood(words, indexes):
             B_rate = pairs[1]
 
     if A_rate == 0.0 and B_rate == 0.0:
-        return np.array([0.2, 0.2, 0.6], np.float32)
+        rates = np.array([0.2, 0.2, 0.6], np.float32)
     else:
         rates = np.array([A_rate, B_rate, 0], np.float32)
-        return rates / np.sum(rates)
+    if y != np.argmax(rates):
+        import random
+        if random.random() < 0.01:
+            print("predicts", predicts)
+            print("sentence", sentence)
+            print("A", words[indexes[1]])
+            print("B", words[indexes[2]])
+            print()
+    return rates / np.sum(rates)
 
 
 def evaluate(test_data, use_preprocessdata=True):
     build()
     data = stanfordnlp_model._load_data(test_data, use_preprocessdata, 'preprocess_testdata.pkl')
+    Y = stanfordnlp_model._get_classify_labels(test_data)
     predicts = np.ndarray([len(test_data), 3], dtype=np.float32)
     for i, (words, indexes) in enumerate(data):
-        predicts[i] = calcurate_likelihood(words, indexes)
+        predicts[i] = calcurate_likelihood(words, indexes, Y[i])
 
-    Y = stanfordnlp_model._get_classify_labels(test_data)
     print("A predict", sum(np.argmax(predicts, axis=1) == 0))
     print("B predict", sum(np.argmax(predicts, axis=1) == 1))
     print("Non predict", sum(np.argmax(predicts, axis=1) == 2))
     print("Test Accuracy:", accuracy_score(Y, np.argmax(predicts, axis=1)))
+
+    corrects = (Y.flatten() == np.argmax(predicts, axis=1))
+    print("Correct loss", log_loss(Y[corrects], predicts[corrects]))
 
     out_df = pandas.DataFrame(data=predicts, columns=['A', 'B', 'NEITHER'])
     out_df['ID'] = test_data['ID']
