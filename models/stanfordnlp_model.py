@@ -470,7 +470,7 @@ def train(use_preprocessdata=True):
     model.fit(
         np.concatenate([X, validation_X]),
         np.concatenate([Y, validation_Y]).flatten())
-    with open('model.pkl', 'wb') as f:
+    with open('stanfordnlp_model.pkl', 'wb') as f:
         pickle.dump(model, f, protocol=pickle.HIGHEST_PROTOCOL)
     y_pred = model.predict(X)
     print("Train Accuracy:", accuracy_score(Y, y_pred))
@@ -479,11 +479,15 @@ def train(use_preprocessdata=True):
 def evaluate(test_data, use_preprocessdata=True):
     train()
     X, Y = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
-    with open('model.pkl', 'rb') as f:
+    with open('stanfordnlp_model.pkl', 'rb') as f:
         model = pickle.load(f)
     y_pred = model.predict(X)
     print("Test Accuracy:", accuracy_score(Y, y_pred))
+
     predicts = model.predict_proba(X)
+    non_neithers = (2 != np.argmax(predicts, axis=1))
+    print("Non Neithers Test Accuracy:", accuracy_score(Y[non_neithers], np.argmax(predicts[non_neithers], axis=1)))
+
     a = (Y.flatten()[:20] != np.argmax(predicts[:20], axis=1))
     print("Error A count", len(Y[Y.flatten() == 0]), len(Y[Y.flatten() == 0][(Y[Y.flatten() == 0].flatten() != np.argmax(predicts[Y.flatten() == 0], axis=1))]))
     print("Error B count", len(Y[Y.flatten() == 1]), len(Y[Y.flatten() == 1][Y[Y.flatten() == 1].flatten() != np.argmax(predicts[Y.flatten() == 1], axis=1)]))
