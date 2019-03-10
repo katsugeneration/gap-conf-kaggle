@@ -45,9 +45,9 @@ def build():
     context = tf.placeholder(tf.int32, [1, None])
     lm_output = model.model(hparams=hparams, X=context, past=None, reuse=tf.AUTO_REUSE)
     logits = lm_output['logits'][:, :, :hparams.n_vocab]
-    values, indices = tf.nn.top_k(logits[:, -1, :], k=10)
+    values, indices = tf.nn.top_k(logits[:, -1, :], k=5)
     rates = tf.math.softmax(values)
-    indices = tf.reshape(indices, [10, 1])
+    indices = tf.reshape(indices, [5, 1])
 
     sess = tf.Session()
     saver = tf.train.Saver()
@@ -175,45 +175,30 @@ def calculate_syntax_likelihood(words, indexes):
     pronounce_children = _get_children(words, indexes[0])
     A_children = _get_children(words, indexes[1])
     B_children = _get_children(words, indexes[2])
+    pronounce_bop = stanfordnlp_model._get_bag_of_pos_with_position(words, indexes[0], 5)
+    A_bop = stanfordnlp_model._get_bag_of_pos_with_position(words, indexes[1], 5)
+    B_bop = stanfordnlp_model._get_bag_of_pos_with_position(words, indexes[2], 5)
     A_points = 0
     B_points = 0
 
-    if len(set([w.text for w in pronounce_children]) & set([w.text for w in A_children])) != 0:
-        A_points += 1
-    elif len(set([w.text for w in pronounce_children]) & set([w.text for w in B_children])) != 0:
-        B_points += 1
-    if len(set([w.dependency_relation.split(":")[0] for w in pronounce_children]) & set([w.dependency_relation.split(":")[0] for w in A_children])) != 0:
-        A_points += 1
-    elif len(set([w.dependency_relation.split(":")[0] for w in pronounce_children]) & set([w.dependency_relation.split(":")[0] for w in B_children])) != 0:
-        B_points += 1
-    if len(set([w.upos for w in pronounce_children]) & set([w.upos for w in A_children])) != 0:
-        A_points += 1
-    elif len(set([w.upos for w in pronounce_children]) & set([w.upos for w in B_children])) != 0:
-        B_points += 1
+    A_points += len(set(pronounce_bop) & set(A_bop))
+    B_points += len(set(pronounce_bop) & set(B_bop))
 
     if pronounce.dependency_relation.split(":")[0] == A.dependency_relation.split(":")[0]:
-        A_points += 1
+        A_points += 1 * 2
     elif pronounce.dependency_relation.split(":")[0] == B.dependency_relation.split(":")[0]:
-        B_points += 1
-    if pronounce.upos == A.upos:
-        A_points += 1
-    elif pronounce.upos == B.upos:
-        B_points += 1
+        B_points += 1 * 2
 
-    if pronounce_governor.text == A_governor.text and pronounce_governor.text != "":
-        A_points += 1
-    elif pronounce_governor.text == B_governor.text and pronounce_governor.text != "":
-        B_points += 1
     if pronounce_governor.dependency_relation.split(":")[0] == A_governor.dependency_relation.split(":")[0] and pronounce_governor.dependency_relation.split(":")[0] != "":
         A_points += 1
     elif pronounce_governor.dependency_relation.split(":")[0] == B_governor.dependency_relation.split(":")[0] and pronounce_governor.dependency_relation.split(":")[0] != "":
         B_points += 1
     if pronounce_governor.upos == A_governor.upos and pronounce_governor.upos != "":
-        A_points += 1
+        A_points += 1 * 2
     elif pronounce_governor.upos == B_governor.upos and pronounce_governor.upos != "":
-        B_points += 1
+        B_points += 1 * 2
 
-    if A_points == 0 and B_points == 0:
+    if A_points < 2 and B_points < 2:
         rates = np.array([0.2, 0.2, 0.6], np.float32)
     elif A_points > B_points:
         rates = np.array([1.0, 0.0, 0.0], np.float32)
@@ -234,10 +219,10 @@ def evaluate(test_data, use_preprocessdata=True):
     # Y = stanfordnlp_model._get_classify_labels(test_data)
     # predicts = np.ndarray([len(test_data), 3], dtype=np.float32)
     for i, (words, indexes) in enumerate(data):
-        predicts[i] = calculate_syntax_likelihood(words, indexes)
-        # predicts[i] = calcurate_likelihood(words, indexes, Y[i])
-        # if np.argmax(predicts[i]) == 2:
-        #     predicts[i] = calculate_syntax_likelihood(words, indexes)
+        # predicts[i] = calculate_syntax_likelihood(words, indexes)
+        predicts[i] = calcurate_likelihood(words, indexes, Y[i])
+        if np.argmax(predicts[i]) == 2:
+            predicts[i] = calculate_syntax_likelihood(words, indexes)
             # predicts[i] = calcurate_likelihood(words, indexes, Y[i])
 
     print("A predict", sum(np.argmax(predicts, axis=1) == 0))
@@ -245,7 +230,8 @@ def evaluate(test_data, use_preprocessdata=True):
     print("Non predict", sum(np.argmax(predicts, axis=1) == 2))
     print("Test Accuracy:", accuracy_score(Y, np.argmax(predicts, axis=1)))
 
-    non_neithers = (2 != np.argmax(predicts, axis=1))
+    non_neithers = ((Y.flatten() != 2) & (np.argmax(predicts, axis=1) != 2))
+    print("Non Neithers Counts", sum(non_neithers))
     print("Non Neithers Test Accuracy:", accuracy_score(Y[non_neithers], np.argmax(predicts[non_neithers], axis=1)))
 
     corrects = (Y.flatten() == np.argmax(predicts, axis=1))
