@@ -357,16 +357,27 @@ def _get_gpt2_likelihood(words, indexes):
     gender = "her" if words[indexes[0]].text.lower() in woman else "his"
     predicts = gpt2_estimator.predict(sentence + "\nQ: What's " + gender + " name?\nA:")
 
-    A_rate = 0.00
-    B_rate = 0.00
+    A_rate1 = 0.00
+    B_rate1 = 0.00
 
     for pairs in reversed(predicts):
         if words[indexes[1]].text.startswith(pairs[0]) and pairs[1] >= 0.2:
-            A_rate = pairs[1]
+            A_rate1 = pairs[1]
         if words[indexes[2]].text.startswith(pairs[0]) and pairs[1] >= 0.2:
-            B_rate = pairs[1]
+            B_rate1 = pairs[1]
 
-    return [A_rate, B_rate]
+    before_pronounce_sentence = gpt2_estimator._get_before_pronounce_sentence(words, indexes[0])
+    predicts = gpt2_estimator.predict(sentence + " " + before_pronounce_sentence)
+    A_rate2 = 0.00
+    B_rate2 = 0.00
+
+    for pairs in reversed(predicts):
+        if words[indexes[1]].text.startswith(pairs[0]) and pairs[1] >= 0.2:
+            A_rate2 = pairs[1]
+        if words[indexes[2]].text.startswith(pairs[0]) and pairs[1] >= 0.2:
+            B_rate2 = pairs[1]
+
+    return [A_rate1, B_rate1, A_rate2, B_rate2]
 
 
 def _load_data(df, use_preprocessdata=False, save_path=None):
