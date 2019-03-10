@@ -112,3 +112,16 @@ def _get_before_pronounce_sentence(words, index):
     sentence = re.sub(r" (\W)", r"\1", sentence)
     sentence = re.sub(r" n't", r"n't", sentence)
     return sentence
+
+
+def _check_pronounce_is_possessive(words, index):
+    """whether pronoun is Possessive or not.
+
+    Args:
+        words (List[Words]): stanfordnlp word object list.
+        index (int): Pronounce index.
+    Return:
+        is_possessive (bool): pronoun is Possessive flag.
+    """
+    pronoun = words[index]
+    return (pronoun.xpos == 'PRP$')

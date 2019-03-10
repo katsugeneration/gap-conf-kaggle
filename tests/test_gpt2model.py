@@ -24,6 +24,22 @@ def test_get_scope_sentence():
     eq_("Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.", sentence)
 
 
+def test_get_before_pronounce_sentence_case_true():
+    words, index1 = utils.charpos_to_word_index(
+            "Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
+            274, 'her')
+    is_possessive = gpt2_estimator._check_pronounce_is_possessive(words, index1)
+    eq_(True, is_possessive)
+
+
+def test_get_before_pronounce_sentence_case_false():
+    words, index1 = utils.charpos_to_word_index(
+            "Her initial ambition was to become a ``cultured'' private secretary working in the highest cultural circles. A month later, the Michigan League building opened, serving co-eds as the Michigan Union served men. Hartwig began by doing secretarial work there, when Dr. Margaret Bell, the head of women's physical education, spotted her.",
+            329, 'her')
+    is_possessive = gpt2_estimator._check_pronounce_is_possessive(words, index1)
+    eq_(False, is_possessive)
+
+
 def test_get_before_pronounce_sentence():
     words, index1 = utils.charpos_to_word_index(
             "Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
