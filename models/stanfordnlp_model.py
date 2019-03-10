@@ -296,18 +296,25 @@ def _get_sexial_labels(df):
     return labels
 
 
-def _get_dependency_labels(words, indexes):
+def _get_dependency_labels(words, indexes, targets):
     """Return dependency parser features
 
     Args:
         words (list): stanfordnlp word list object having pos attributes.
         indexes (List[int]): target indexes
+        targets (List[str]): target word list. length is same as indexes
     Return:
         feature_list (List[int]): features list. shape is (2, 1)
     """
+    pronounce_bop = _get_bag_of_pos_with_position(words, indexes[0], DEFAULT_WINDOW_SIZE, target_len=len(targets[0]))
+    A_bop = _get_bag_of_pos_with_position(words, indexes[1], DEFAULT_WINDOW_SIZE, target_len=len(targets[1]))
+    B_bop = _get_bag_of_pos_with_position(words, indexes[2], DEFAULT_WINDOW_SIZE, target_len=len(targets[2]))
+
     feature_list = [
         words[indexes[0]].dependency_relation == words[indexes[1]].dependency_relation,
-        words[indexes[0]].dependency_relation == words[indexes[2]].dependency_relation
+        words[indexes[0]].dependency_relation == words[indexes[2]].dependency_relation,
+        len(set(pronounce_bop) & set(A_bop)),
+        len(set(pronounce_bop) & set(B_bop))
     ]
     return feature_list
 
@@ -383,7 +390,7 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
             _vectorise_bag_of_pos_with_position(words, indexes, DEFAULT_WINDOW_SIZE,
                                                 targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
         X2.append(_vectorise_bag_of_pos_with_dependency(words, indexes))
-        X3.append(_get_dependency_labels(words, indexes))
+        X3.append(_get_dependency_labels(words, indexes, targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
 
     X = np.array(X)
     X2 = np.array(X2)
