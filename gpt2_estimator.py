@@ -87,3 +87,28 @@ def _get_scope_sentence(words, indexes):
     sentence = re.sub(r" (\W)", r"\1", sentence)
     sentence = re.sub(r" n't", r"n't", sentence)
     return sentence
+
+
+def _get_before_pronounce_sentence(words, index):
+    """Return before pronounce sentence
+
+    Args:
+        words (List[Words]): stanfordnlp word object list.
+        index (int): Pronounce index.
+    Return:
+        sentence (str): target word contains sentence to pronounce.
+    """
+    roots = [(i, w) for i, w in enumerate(words) if int(w.index) == 1]
+    start_index = 0
+    for i, w in roots:
+        if i <= index:
+            start_index = i
+        else:
+            break
+    governor_index = index + (int(words[index].governor) - int(words[index].index))
+    if governor_index < index:
+        start_index = governor_index
+    sentence = " ".join([w.text for w in words[start_index:index]])
+    sentence = re.sub(r" (\W)", r"\1", sentence)
+    sentence = re.sub(r" n't", r"n't", sentence)
+    return sentence

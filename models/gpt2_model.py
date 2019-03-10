@@ -132,7 +132,7 @@ def evaluate(test_data, use_preprocessdata=True):
     # predicts = np.ndarray([len(test_data), 3], dtype=np.float32)
     for i, (words, indexes) in enumerate(data):
         # predicts[i] = calculate_syntax_likelihood(words, indexes)
-        predicts[i] = calcurate_likelihood(words, indexes, Y[i])
+        predicts[i] = calcurate_likelihood(words, indexes)
         if np.argmax(predicts[i]) == 2:
             predicts[i] = calculate_syntax_likelihood(words, indexes)
             # predicts[i] = calcurate_likelihood(words, indexes, Y[i])
