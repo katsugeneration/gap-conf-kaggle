@@ -7,7 +7,7 @@ import numpy as np
 from sklearn.linear_model import LogisticRegression
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
-from sklearn.metrics import accuracy_score, log_loss
+from sklearn.metrics import accuracy_score, log_loss, confusion_matrix
 from sklearn.feature_extraction.text import CountVectorizer
 import optuna
 import xgboost as xgb
@@ -491,29 +491,12 @@ def evaluate(test_data, use_preprocessdata=True):
     y_pred = model.predict(X)
     print("Test Accuracy:", accuracy_score(Y, y_pred))
 
+    print("Confusion Matrix:\n", confusion_matrix(Y, y_pred))
+    non_neithers = ((Y.flatten() != 2) & (y_pred != 2))
+    print("Non Neithers Counts", sum(non_neithers))
+    print("Non Neithers Test Accuracy:", accuracy_score(Y[non_neithers], y_pred[non_neithers]))
+
     predicts = model.predict_proba(X)
-    non_neithers = (2 != np.argmax(predicts, axis=1))
-    print("Non Neithers Test Accuracy:", accuracy_score(Y[non_neithers], np.argmax(predicts[non_neithers], axis=1)))
-
-    a = (Y.flatten()[:20] != np.argmax(predicts[:20], axis=1))
-    print("Error A count", len(Y[Y.flatten() == 0]), len(Y[Y.flatten() == 0][(Y[Y.flatten() == 0].flatten() != np.argmax(predicts[Y.flatten() == 0], axis=1))]))
-    print("Error B count", len(Y[Y.flatten() == 1]), len(Y[Y.flatten() == 1][Y[Y.flatten() == 1].flatten() != np.argmax(predicts[Y.flatten() == 1], axis=1)]))
-    print("Error Pronnoun count", len(Y[Y.flatten() == 2]), len(Y[Y.flatten() == 2][Y[Y.flatten() == 2].flatten() != np.argmax(predicts[Y.flatten() == 2], axis=1)]))
-    print("Error Case", Y[:20][a])
-    print("Error Case Label", np.argmax(predicts[:20][a], axis=1))
-    print("Error Case Rate", predicts[:20][a])
-
-    data = _load_data(test_data, True, 'preprocess_testdata.pkl')
-    for i, (words, indexes) in enumerate(data):
-        if i in np.where(a == True)[0]:
-            print("Index", i)
-            print("Pronounce position", _get_bag_of_pos_with_position(words, indexes[0], DEFAULT_WINDOW_SIZE, target_len=len(test_data['Pronoun'][i].split())))
-            print("A position", _get_bag_of_pos_with_position(words, indexes[1], DEFAULT_WINDOW_SIZE, target_len=len(test_data['A'][i].split())))
-            print("B position", _get_bag_of_pos_with_position(words, indexes[2], DEFAULT_WINDOW_SIZE, target_len=len(test_data['B'][i].split())))
-            print("Pronounce dependency", _get_bag_of_pos_with_dependency(words, indexes[0]))
-            print("A dependency", _get_bag_of_pos_with_dependency(words, indexes[1]))
-            print("B dependency", _get_bag_of_pos_with_dependency(words, indexes[2]))
-
     out_df = pandas.DataFrame(data=predicts, columns=['A', 'B', 'NEITHER'])
     out_df['ID'] = test_data['ID']
     return out_df
