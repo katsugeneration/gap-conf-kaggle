@@ -83,7 +83,7 @@ def _get_scope_sentence(words, indexes):
         elif (i >= indexes).all():
             end_index = i - 1
             break
-    sentence = " ".join([w.text for w in words[start_index:end_index+1]])
+    sentence = " ".join([w.text for w in words[0:end_index+1]])
     sentence = re.sub(r" (\W)", r"\1", sentence)
     sentence = re.sub(r" n't", r"n't", sentence)
     return sentence
