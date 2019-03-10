@@ -1,5 +1,6 @@
 import pandas
 import utils
+import gpt2_estimator
 import pickle
 from collections import namedtuple
 import itertools
@@ -342,6 +343,32 @@ def _get_same_sentence_features(words, indexes):
     return feature_list
 
 
+def _get_gpt2_likelihood(words, indexes):
+    """Return choice likelihoods
+
+    Args:
+        words (List[Words]): stanfordnlp word object list.
+        indexe (List[int]): target index list. format is [Pronoun, A, B]
+    Return:
+        rates (List[float]): selection likelihood. [A, B, NEITHER]
+    """
+    woman = ["she", "her"]
+    sentence = gpt2_estimator._get_scope_sentence(words, np.array(indexes))
+    gender = "her" if words[indexes[0]].text.lower() in woman else "his"
+    predicts = gpt2_estimator.predict(sentence + "\nQ: What's " + gender + " name?\nA:")
+
+    A_rate = 0.00
+    B_rate = 0.00
+
+    for pairs in reversed(predicts):
+        if words[indexes[1]].text.startswith(pairs[0]) and pairs[1] >= 0.2:
+            A_rate = pairs[1]
+        if words[indexes[2]].text.startswith(pairs[0]) and pairs[1] >= 0.2:
+            B_rate = pairs[1]
+
+    return [A_rate, B_rate]
+
+
 def _load_data(df, use_preprocessdata=False, save_path=None):
     """Load preprocess task speccific data.
     Args:
@@ -385,12 +412,14 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     X = []
     X2 = []
     X3 = []
+    X4 = []
     for i, (words, indexes) in enumerate(data):
         X.append(
             _vectorise_bag_of_pos_with_position(words, indexes, DEFAULT_WINDOW_SIZE,
                                                 targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
         X2.append(_vectorise_bag_of_pos_with_dependency(words, indexes))
         X3.append(_get_dependency_labels(words, indexes, targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
+        X4.append(_get_gpt2_likelihood(words, indexes))
 
     X = np.array(X)
     X2 = np.array(X2)
@@ -417,6 +446,7 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
         np.absolute(X2_pr * X2_a).sum(axis=1, keepdims=True) - np.absolute(X2_pr * X2_b).sum(axis=1, keepdims=True),
         _get_sexial_labels(df),
         X3,
+        X4,
         (df['Pronoun-offset'] - df['A-offset']).values.reshape(len(X), 1),
         (df['Pronoun-offset'] - df['B-offset']).values.reshape(len(X), 1)), axis=1)
     Y = _get_classify_labels(df)
@@ -484,6 +514,7 @@ def train(use_preprocessdata=True):
 
 
 def evaluate(test_data, use_preprocessdata=True):
+    gpt2_estimator.build()
     train()
     X, Y = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
     with open('stanfordnlp_model.pkl', 'rb') as f:
