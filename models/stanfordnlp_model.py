@@ -328,10 +328,10 @@ def _get_dependency_labels(words, indexes, targets):
     B_governor = _get_governor(words, indexes[2])
 
     feature_list = [
-        words[indexes[0]].dependency_relation == words[indexes[1]].dependency_relation,
-        words[indexes[0]].dependency_relation == words[indexes[2]].dependency_relation,
-        pronounce_governor.dependency_relation == A_governor.dependency_relation,
-        pronounce_governor.dependency_relation == B_governor.dependency_relation,
+        words[indexes[0]].dependency_relation.split(":")[0] == words[indexes[1]].dependency_relation.split(":")[0],
+        words[indexes[0]].dependency_relation.split(":")[0] == words[indexes[2]].dependency_relation.split(":")[0],
+        pronounce_governor.dependency_relation.split(":")[0] == A_governor.dependency_relation.split(":")[0],
+        pronounce_governor.dependency_relation.split(":")[0] == B_governor.dependency_relation.split(":")[0],
         pronounce_governor.upos == A_governor.upos,
         pronounce_governor.upos == B_governor.upos,
         len(set(pronounce_bop) & set(A_bop)),
