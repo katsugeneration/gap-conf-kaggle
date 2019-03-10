@@ -8,6 +8,7 @@ import pandas
 import numpy as np
 import tensorflow as tf
 import importlib.util
+from collections import namedtuple
 from sklearn.metrics import accuracy_score, log_loss
 from models import stanfordnlp_model
 
@@ -26,6 +27,8 @@ enc = encoder.get_encoder(model_name)
 targets = None
 context = None
 rates = None
+
+DummyWord = namedtuple("DummyWord", "upos dependency_relation text")
 
 
 def build():
@@ -124,16 +127,34 @@ def calcurate_likelihood(words, indexes, y):
 
 
 def _get_governor(words, index):
-    governor_list = []
     if int(words[index].governor) == 0:
         # case index word has no governer
-        return -1, governor_list
+        return DummyWord("", "", "")
     governor_index = index + (int(words[index].governor) - int(words[index].index))
     if governor_index < len(words):
         governor = words[governor_index]
-        return stanfordnlp_model._get_word_feature(governor)
+        return governor
     else:
-        return stanfordnlp_model.NONE_DEPENDENCY
+        return DummyWord("", "", "")
+
+
+def _get_children(words, index):
+    children = []
+    child_list = []
+    roots = [(i, w) for i, w in enumerate(words) if int(w.index) == 1]
+    start_index = 0
+    end_index = len(words) - 1
+    for i, w in roots:
+        if i <= index:
+            start_index = i
+        else:
+            end_index = i - 1
+            break
+    for i, w in enumerate(words[start_index:end_index + 1]):
+        if int(w.governor) == int(words[index].index):
+            children.append(start_index + i)
+            child_list.append(w)
+    return child_list
 
 
 def calculate_syntax_likelihood(words, indexes):
@@ -145,19 +166,61 @@ def calculate_syntax_likelihood(words, indexes):
     Return:
         rates (List[float]): selection likelihood. [A, B, NEITHER]
     """
-    pronounce_dependency_relation = words[indexes[0]].dependency_relation
-    A_dependency_relation = words[indexes[1]].dependency_relation
-    B_dependency_relation = words[indexes[2]].dependency_relation
+    pronounce = words[indexes[0]]
+    A = words[indexes[1]]
+    B = words[indexes[2]]
     pronounce_governor = _get_governor(words, indexes[0])
     A_governor = _get_governor(words, indexes[1])
     B_governor = _get_governor(words, indexes[2])
+    pronounce_children = _get_children(words, indexes[0])
+    A_children = _get_children(words, indexes[1])
+    B_children = _get_children(words, indexes[2])
+    A_points = 0
+    B_points = 0
 
-    if pronounce_dependency_relation == A_dependency_relation and pronounce_governor == A_governor:
+    if len(set([w.text for w in pronounce_children]) & set([w.text for w in A_children])) != 0:
+        A_points += 1
+    elif len(set([w.text for w in pronounce_children]) & set([w.text for w in B_children])) != 0:
+        B_points += 1
+    if len(set([w.dependency_relation.split(":")[0] for w in pronounce_children]) & set([w.dependency_relation.split(":")[0] for w in A_children])) != 0:
+        A_points += 1
+    elif len(set([w.dependency_relation.split(":")[0] for w in pronounce_children]) & set([w.dependency_relation.split(":")[0] for w in B_children])) != 0:
+        B_points += 1
+    if len(set([w.upos for w in pronounce_children]) & set([w.upos for w in A_children])) != 0:
+        A_points += 1
+    elif len(set([w.upos for w in pronounce_children]) & set([w.upos for w in B_children])) != 0:
+        B_points += 1
+
+    if pronounce.dependency_relation.split(":")[0] == A.dependency_relation.split(":")[0]:
+        A_points += 1
+    elif pronounce.dependency_relation.split(":")[0] == B.dependency_relation.split(":")[0]:
+        B_points += 1
+    if pronounce.upos == A.upos:
+        A_points += 1
+    elif pronounce.upos == B.upos:
+        B_points += 1
+
+    if pronounce_governor.text == A_governor.text and pronounce_governor.text != "":
+        A_points += 1
+    elif pronounce_governor.text == B_governor.text and pronounce_governor.text != "":
+        B_points += 1
+    if pronounce_governor.dependency_relation.split(":")[0] == A_governor.dependency_relation.split(":")[0] and pronounce_governor.dependency_relation.split(":")[0] != "":
+        A_points += 1
+    elif pronounce_governor.dependency_relation.split(":")[0] == B_governor.dependency_relation.split(":")[0] and pronounce_governor.dependency_relation.split(":")[0] != "":
+        B_points += 1
+    if pronounce_governor.upos == A_governor.upos and pronounce_governor.upos != "":
+        A_points += 1
+    elif pronounce_governor.upos == B_governor.upos and pronounce_governor.upos != "":
+        B_points += 1
+
+    if A_points == 0 and B_points == 0:
+        rates = np.array([0.2, 0.2, 0.6], np.float32)
+    elif A_points > B_points:
         rates = np.array([1.0, 0.0, 0.0], np.float32)
-    elif pronounce_dependency_relation == B_dependency_relation and pronounce_governor == B_governor:
+    elif A_points < B_points:
         rates = np.array([0.0, 1.0, 0.0], np.float32)
     else:
-        rates = np.array([0.2, 0.2, 0.6], np.float32)
+        rates = np.array([0.5, 0.5, 0.0], np.float32)
     return rates / np.sum(rates)
 
 
@@ -171,10 +234,10 @@ def evaluate(test_data, use_preprocessdata=True):
     # Y = stanfordnlp_model._get_classify_labels(test_data)
     # predicts = np.ndarray([len(test_data), 3], dtype=np.float32)
     for i, (words, indexes) in enumerate(data):
-        # predicts[i] = calculate_syntax_likelihood(words, indexes)
-        predicts[i] = calcurate_likelihood(words, indexes, Y[i])
-        if np.argmax(predicts[i]) == 2:
-            predicts[i] = calculate_syntax_likelihood(words, indexes)
+        predicts[i] = calculate_syntax_likelihood(words, indexes)
+        # predicts[i] = calcurate_likelihood(words, indexes, Y[i])
+        # if np.argmax(predicts[i]) == 2:
+        #     predicts[i] = calculate_syntax_likelihood(words, indexes)
             # predicts[i] = calcurate_likelihood(words, indexes, Y[i])
 
     print("A predict", sum(np.argmax(predicts, axis=1) == 0))
