@@ -336,6 +336,8 @@ def _get_dependency_labels(words, indexes, targets):
         pronounce_governor.upos == B_governor.upos,
         len(set(pronounce_bop) & set(A_bop)),
         len(set(pronounce_bop) & set(B_bop)),
+        abs(indexes[0] - indexes[1]),
+        abs(indexes[0] - indexes[2]),
         int(gpt2_estimator._check_pronounce_is_possessive(words, indexes[0]))
     ]
     return feature_list
