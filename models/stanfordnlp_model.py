@@ -297,6 +297,18 @@ def _get_sexial_labels(df):
     return labels
 
 
+def _get_governor(words, index):
+    if int(words[index].governor) == 0:
+        # case index word has no governer
+        return DummyWord("", "", "")
+    governor_index = index + (int(words[index].governor) - int(words[index].index))
+    if governor_index < len(words):
+        governor = words[governor_index]
+        return governor
+    else:
+        return DummyWord("", "", "")
+
+
 def _get_dependency_labels(words, indexes, targets):
     """Return dependency parser features
 
@@ -311,9 +323,17 @@ def _get_dependency_labels(words, indexes, targets):
     A_bop = _get_bag_of_pos_with_position(words, indexes[1], DEFAULT_WINDOW_SIZE, target_len=len(targets[1]))
     B_bop = _get_bag_of_pos_with_position(words, indexes[2], DEFAULT_WINDOW_SIZE, target_len=len(targets[2]))
 
+    pronounce_governor = _get_governor(words, indexes[0])
+    A_governor = _get_governor(words, indexes[1])
+    B_governor = _get_governor(words, indexes[2])
+
     feature_list = [
         words[indexes[0]].dependency_relation == words[indexes[1]].dependency_relation,
         words[indexes[0]].dependency_relation == words[indexes[2]].dependency_relation,
+        pronounce_governor.dependency_relation == A_governor.dependency_relation,
+        pronounce_governor.dependency_relation == B_governor.dependency_relation,
+        pronounce_governor.upos == A_governor.upos,
+        pronounce_governor.upos == B_governor.upos,
         len(set(pronounce_bop) & set(A_bop)),
         len(set(pronounce_bop) & set(B_bop)),
         int(gpt2_estimator._check_pronounce_is_possessive(words, indexes[0]))
@@ -460,7 +480,8 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
         X3,
         X4,
         (df['Pronoun-offset'] - df['A-offset']).values.reshape(len(X), 1),
-        (df['Pronoun-offset'] - df['B-offset']).values.reshape(len(X), 1)), axis=1)
+        (df['Pronoun-offset'] - df['B-offset']).values.reshape(len(X), 1)
+    ), axis=1)
     Y = _get_classify_labels(df)
     return X, Y
 
