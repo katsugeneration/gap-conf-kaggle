@@ -315,7 +315,8 @@ def _get_dependency_labels(words, indexes, targets):
         words[indexes[0]].dependency_relation == words[indexes[1]].dependency_relation,
         words[indexes[0]].dependency_relation == words[indexes[2]].dependency_relation,
         len(set(pronounce_bop) & set(A_bop)),
-        len(set(pronounce_bop) & set(B_bop))
+        len(set(pronounce_bop) & set(B_bop)),
+        int(gpt2_estimator._check_pronounce_is_possessive(words, indexes[0]))
     ]
     return feature_list
 
