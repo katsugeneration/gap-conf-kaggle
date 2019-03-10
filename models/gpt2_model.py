@@ -9,7 +9,7 @@ import numpy as np
 import tensorflow as tf
 import importlib.util
 from collections import namedtuple
-from sklearn.metrics import accuracy_score, log_loss
+from sklearn.metrics import accuracy_score, log_loss, confusion_matrix
 from models import stanfordnlp_model
 
 # Load Open AI GPT-2 module
@@ -172,9 +172,6 @@ def calculate_syntax_likelihood(words, indexes):
     pronounce_governor = _get_governor(words, indexes[0])
     A_governor = _get_governor(words, indexes[1])
     B_governor = _get_governor(words, indexes[2])
-    pronounce_children = _get_children(words, indexes[0])
-    A_children = _get_children(words, indexes[1])
-    B_children = _get_children(words, indexes[2])
     pronounce_bop = stanfordnlp_model._get_bag_of_pos_with_position(words, indexes[0], 5)
     A_bop = stanfordnlp_model._get_bag_of_pos_with_position(words, indexes[1], 5)
     B_bop = stanfordnlp_model._get_bag_of_pos_with_position(words, indexes[2], 5)
@@ -198,7 +195,7 @@ def calculate_syntax_likelihood(words, indexes):
     elif pronounce_governor.upos == B_governor.upos and pronounce_governor.upos != "":
         B_points += 1 * 2
 
-    if A_points < 2 and B_points < 2:
+    if A_points < 4 and B_points < 4:
         rates = np.array([0.2, 0.2, 0.6], np.float32)
     elif A_points > B_points:
         rates = np.array([1.0, 0.0, 0.0], np.float32)
@@ -229,6 +226,7 @@ def evaluate(test_data, use_preprocessdata=True):
     print("B predict", sum(np.argmax(predicts, axis=1) == 1))
     print("Non predict", sum(np.argmax(predicts, axis=1) == 2))
     print("Test Accuracy:", accuracy_score(Y, np.argmax(predicts, axis=1)))
+    print("Confusion Matrix:\n", confusion_matrix(Y, np.argmax(predicts, axis=1)))
 
     non_neithers = ((Y.flatten() != 2) & (np.argmax(predicts, axis=1) != 2))
     print("Non Neithers Counts", sum(non_neithers))
