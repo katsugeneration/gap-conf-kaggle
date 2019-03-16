@@ -4,3 +4,6 @@
 [submodule "gpt-2"]
 	path = gpt-2
 	url = https://github.com/openai/gpt-2.git
+[submodule "bert"]
+	path = bert
+	url = https://github.com/google-research/bert.git
