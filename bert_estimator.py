@@ -19,6 +19,9 @@ spec.loader.exec_module(tokenization)
 
 BERT_PATH = "multi_cased_L-12_H-768_A-12/"
 seq_length = 128
+estimator = None
+tokenizer = None
+layer_indexes = [-4]
 
 
 class InputExample(object):
@@ -187,10 +190,39 @@ def input_fn_builder(features, seq_length):
     return input_fn
 
 
-# Initialize BERT settings
-bert_config = modeling.BertConfig.from_json_file(BERT_PATH + "bert_config.json")
-tokenizer = tokenization.FullTokenizer(
-    vocab_file=BERT_PATH + "vocab.txt", do_lower_case=True)
+def build():
+    global estimator
+    global tokenizer
+
+    # Initialize BERT settings
+    bert_config = modeling.BertConfig.from_json_file(BERT_PATH + "bert_config.json")
+    tokenizer = tokenization.FullTokenizer(
+        vocab_file=BERT_PATH + "vocab.txt", do_lower_case=True)
+
+    model_fn = model_fn_builder(
+        bert_config=bert_config,
+        init_checkpoint=BERT_PATH + "bert_model.ckpt",
+        layer_indexes=layer_indexes,
+        use_tpu=False,
+        use_one_hot_embeddings=False)
+
+    # If TPU is not available, this will fall back to normal Estimator on CPU
+    # or GPU.
+    is_per_host = tf.contrib.tpu.InputPipelineConfig.PER_HOST_V2
+    run_config = tf.contrib.tpu.RunConfig(
+        master=None,
+        tpu_config=tf.contrib.tpu.TPUConfig(
+            num_shards=8,
+            per_host_input_for_training=is_per_host))
+
+    estimator = tf.contrib.tpu.TPUEstimator(
+        use_tpu=False,
+        model_fn=model_fn,
+        config=run_config,
+        predict_batch_size=8)
+
+
+build()
 examples = read_examples(['Who was Jim Henson ?'])
 features = convert_examples_to_features(
     examples=examples, seq_length=seq_length, tokenizer=tokenizer)
@@ -198,28 +230,6 @@ features = convert_examples_to_features(
 unique_id_to_feature = {}
 for feature in features:
     unique_id_to_feature[feature.unique_id] = feature
-layer_indexes = [-4]
-model_fn = model_fn_builder(
-      bert_config=bert_config,
-      init_checkpoint=BERT_PATH + "bert_model.ckpt",
-      layer_indexes=layer_indexes,
-      use_tpu=False,
-      use_one_hot_embeddings=False)
-
-# If TPU is not available, this will fall back to normal Estimator on CPU
-# or GPU.
-is_per_host = tf.contrib.tpu.InputPipelineConfig.PER_HOST_V2
-run_config = tf.contrib.tpu.RunConfig(
-    master=None,
-    tpu_config=tf.contrib.tpu.TPUConfig(
-        num_shards=8,
-        per_host_input_for_training=is_per_host))
-
-estimator = tf.contrib.tpu.TPUEstimator(
-    use_tpu=False,
-    model_fn=model_fn,
-    config=run_config,
-    predict_batch_size=8)
 
 input_fn = input_fn_builder(
     features=features, seq_length=seq_length)
