@@ -123,14 +123,14 @@ def model_fn_builder(bert_config, init_checkpoint, layer_indexes, use_tpu,
             tvars, init_checkpoint)
         tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
 
-        all_layers = model.get_all_encoder_layers()
+        all_attention_heads = model.get_all_attention_heads()
 
         predictions = {
             "unique_id": unique_ids,
         }
 
         for (i, layer_index) in enumerate(layer_indexes):
-            predictions["layer_output_%d" % i] = all_layers[layer_index]
+            predictions["attention_head_%d" % i] = all_attention_heads[layer_index]
 
         output_spec = tf.contrib.tpu.TPUEstimatorSpec(
             mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
@@ -233,11 +233,11 @@ for result in estimator.predict(input_fn, yield_single_examples=True):
     for (i, token) in enumerate(feature.tokens):
         all_layers = []
         for (j, layer_index) in enumerate(layer_indexes):
-            layer_output = result["layer_output_%d" % j]
+            attention_head = result["attention_head_%d" % j]
             layers = collections.OrderedDict()
             layers["index"] = layer_index
             layers["values"] = [
-                round(float(x), 6) for x in layer_output[i:(i + 1)].flat
+                round(float(x), 6) for x in attention_head[i:(i + 1)].flat
             ]
         all_layers.append(layers)
     features = collections.OrderedDict()
