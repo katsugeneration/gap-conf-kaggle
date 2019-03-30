@@ -1,10 +1,12 @@
 # Limitations under the MIT License.
 # Copyright 2019 Katsuya Shimabukuro.
+# Refer to https://github.com/google-research/bert/blob/master/extract_features.py
 
 import os
 import re
 import json
 import collections
+import numpy as np
 import tensorflow as tf
 import importlib.util
 
@@ -18,10 +20,9 @@ tokenization = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tokenization)
 
 BERT_PATH = "multi_cased_L-12_H-768_A-12/"
-seq_length = 128
+seq_length = 256
 estimator = None
 tokenizer = None
-layer_indexes = [-4]
 
 
 class InputExample(object):
@@ -96,8 +97,7 @@ def read_examples(texts):
     return examples
 
 
-def model_fn_builder(bert_config, init_checkpoint, layer_indexes, use_tpu,
-                     use_one_hot_embeddings):
+def model_fn_builder(bert_config, init_checkpoint, use_tpu, use_one_hot_embeddings):
     """Returns `model_fn` closure for TPUEstimator."""
 
     def model_fn(features, labels, mode, params):  # pylint: disable=unused-argument
@@ -128,15 +128,9 @@ def model_fn_builder(bert_config, init_checkpoint, layer_indexes, use_tpu,
 
         all_attention_heads = model.get_all_attention_heads()
 
-        predictions = {
-            "unique_id": unique_ids,
-        }
-
-        for (i, layer_index) in enumerate(layer_indexes):
-            predictions["attention_head_%d" % i] = all_attention_heads[layer_index]
-
         output_spec = tf.contrib.tpu.TPUEstimatorSpec(
-            mode=mode, predictions=predictions, scaffold_fn=scaffold_fn)
+            mode=mode, predictions=tf.convert_to_tensor(all_attention_heads),
+            scaffold_fn=scaffold_fn)
         return output_spec
 
     return model_fn
@@ -202,7 +196,6 @@ def build():
     model_fn = model_fn_builder(
         bert_config=bert_config,
         init_checkpoint=BERT_PATH + "bert_model.ckpt",
-        layer_indexes=layer_indexes,
         use_tpu=False,
         use_one_hot_embeddings=False)
 
@@ -222,14 +215,14 @@ def build():
         predict_batch_size=1)
 
 
-def predict(text, targets):
+def predict(text):
     """Return attention values.
 
     Args:
         text (str): input text for predction
-        targets (List[str]): target tokens
     Return:
-        attention_values (List[Float]): attention values. shape is (targets_len, targets_len, num_heads)
+        attention_values (List[Float]): attention values. shape is (num_layers, targets_len, targets_len, num_heads)
+        tokens (List(str))
     """
     examples = read_examples([text])
     features = convert_examples_to_features(
@@ -238,27 +231,37 @@ def predict(text, targets):
     input_fn = input_fn_builder(
         features=features, seq_length=seq_length)
 
-    result = list(estimator.predict(input_fn, yield_single_examples=True))[0]
-    feature = features[0]
-    output_json = collections.OrderedDict()
-    all_features = []
-    for (i, token) in enumerate(feature.tokens):
-        all_layers = []
-        for (j, layer_index) in enumerate(layer_indexes):
-            attention_head = result["attention_head_%d" % j]
-            layers = collections.OrderedDict()
-            layers["index"] = layer_index
-            layers["values"] = [
-                round(float(x), 6) for x in attention_head[i:(i + 1)].flat
-            ]
-        all_layers.append(layers)
-    features = collections.OrderedDict()
-    features["token"] = token
-    features["layers"] = all_layers
-    all_features.append(features)
-    output_json["features"] = all_features
-    print(output_json["features"])
+    predictions = list(estimator.predict(input_fn, yield_single_examples=True))[0]
+    return predictions, features[0].tokens
+
+
+def _get_token_attentions(text, words, indexes):
+    """Return target attention values
+
+    Args:
+        text (str): input text for predction
+        words (List[Words]): stanfordnlp word object list.
+        indexe (List[int]): target index list. format is [Pronoun, A, B]
+    Return:
+        attentions ([List[Float]]): word to word attention values. shape is (num_layers, len(words), len(words), num_heads)
+    """
+    targets = sorted(enumerate(zip(words, indexes)), key=lambda x: x[1][1])
+    attention_values, tokens = predict(text)
+
+    before = 0
+    word_indeces = [0] * len(words)
+    for i, (word, index) in targets:
+        indices = [j for j, x in enumerate(tokens) if word.lower().startswith(x) and j > before]
+        before = min(indices, key=lambda x: abs(x - index))
+        word_indeces[i] = before
+
+    attentions = []
+    for i in word_indeces:
+        attentions.append(attention_values[:, word_indeces, i:i+1])
+    attentions = np.transpose(attentions, (3, 1, 2, 0, 4))[0]
+    return attentions
 
 
 build()
-print(predict('Who was Jim Henson ?', None))
+print(_get_token_attentions("Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
+['her', 'Cheryl', 'Pauline'], [57, 39, 42]))
