@@ -219,26 +219,28 @@ def build():
         use_tpu=False,
         model_fn=model_fn,
         config=run_config,
-        predict_batch_size=8)
+        predict_batch_size=1)
 
 
-build()
-examples = read_examples(['Who was Jim Henson ?'])
-features = convert_examples_to_features(
-    examples=examples, seq_length=seq_length, tokenizer=tokenizer)
+def predict(text, targets):
+    """Return attention values.
 
-unique_id_to_feature = {}
-for feature in features:
-    unique_id_to_feature[feature.unique_id] = feature
+    Args:
+        text (str): input text for predction
+        targets (List[str]): target tokens
+    Return:
+        attention_values (List[Float]): attention values. shape is (targets_len, targets_len, num_heads)
+    """
+    examples = read_examples([text])
+    features = convert_examples_to_features(
+        examples=examples, seq_length=seq_length, tokenizer=tokenizer)
 
-input_fn = input_fn_builder(
-    features=features, seq_length=seq_length)
+    input_fn = input_fn_builder(
+        features=features, seq_length=seq_length)
 
-for result in estimator.predict(input_fn, yield_single_examples=True):
-    unique_id = int(result["unique_id"])
-    feature = unique_id_to_feature[unique_id]
+    result = list(estimator.predict(input_fn, yield_single_examples=True))[0]
+    feature = features[0]
     output_json = collections.OrderedDict()
-    output_json["linex_index"] = unique_id
     all_features = []
     for (i, token) in enumerate(feature.tokens):
         all_layers = []
@@ -255,4 +257,8 @@ for result in estimator.predict(input_fn, yield_single_examples=True):
     features["layers"] = all_layers
     all_features.append(features)
     output_json["features"] = all_features
-print(output_json)
+    print(output_json["features"])
+
+
+build()
+print(predict('Who was Jim Henson ?', None))
