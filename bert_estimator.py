@@ -3,14 +3,11 @@
 # Refer to https://github.com/google-research/bert/blob/master/extract_features.py
 
 import os
-import re
-import json
-import collections
 import numpy as np
 import tensorflow as tf
 import importlib.util
 
-# Load Open AI GPT-2 module
+# Load BERT module
 gpt2_path = os.path.join(os.path.dirname(__file__), "bert")
 spec = importlib.util.spec_from_file_location("modeling", os.path.join(gpt2_path, "modeling.py"))
 modeling = importlib.util.module_from_spec(spec)
@@ -20,7 +17,7 @@ tokenization = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tokenization)
 
 BERT_PATH = "multi_cased_L-12_H-768_A-12/"
-seq_length = 256
+seq_length = 512
 estimator = None
 tokenizer = None
 
@@ -212,7 +209,7 @@ def build():
         use_tpu=False,
         model_fn=model_fn,
         config=run_config,
-        predict_batch_size=1)
+        predict_batch_size=10)
 
 
 def predict(text):
@@ -224,15 +221,15 @@ def predict(text):
         attention_values (List[Float]): attention values. shape is (num_layers, targets_len, targets_len, num_heads)
         tokens (List(str))
     """
-    examples = read_examples([text])
+    examples = read_examples(text)
     features = convert_examples_to_features(
         examples=examples, seq_length=seq_length, tokenizer=tokenizer)
 
     input_fn = input_fn_builder(
         features=features, seq_length=seq_length)
 
-    predictions = list(estimator.predict(input_fn, yield_single_examples=True))[0]
-    return predictions, features[0].tokens
+    predictions = estimator.predict(input_fn, yield_single_examples=True)
+    return predictions, [f.tokens for f in features]
 
 
 def _get_token_attentions(text, words, indexes):
@@ -245,23 +242,26 @@ def _get_token_attentions(text, words, indexes):
     Return:
         attentions ([List[Float]]): word to word attention values. shape is (num_layers, len(words), len(words), num_heads)
     """
-    targets = sorted(enumerate(zip(words, indexes)), key=lambda x: x[1][1])
+    targets = [sorted(enumerate(zip(w, indices)), key=lambda x: x[1][1]) for w, indices in zip(words, indexes)]
     attention_values, tokens = predict(text)
 
-    before = 0
-    word_indeces = [0] * len(words)
-    for i, (word, index) in targets:
-        indices = [j for j, x in enumerate(tokens) if word.lower().startswith(x) and j > before]
-        before = min(indices, key=lambda x: abs(x - index))
-        word_indeces[i] = before
+    all_attentions = []
+    for k, avar in enumerate(attention_values):
+        before = 0
+        word_indeces = [0] * len(words[k])
+        for i, (word, index) in targets[k]:
+            indices = [j for j, x in enumerate(tokens[k]) if word.lower().startswith(x) and j > before]
+            before = min(indices, key=lambda x: abs(x - index))
+            word_indeces[i] = before
 
-    attentions = []
-    for i in word_indeces:
-        attentions.append(attention_values[:, word_indeces, i:i+1])
-    attentions = np.transpose(attentions, (3, 1, 2, 0, 4))[0]
-    return attentions
+        attentions = []
+        for i in word_indeces:
+            attentions.append(avar[:, word_indeces, i:i+1])
+        attentions = np.transpose(attentions, (3, 1, 2, 0, 4))[0].flatten()
+        all_attentions.append(attentions)
+    return all_attentions
 
 
-build()
-print(_get_token_attentions("Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
-['her', 'Cheryl', 'Pauline'], [57, 39, 42]))
+# build()
+# print(_get_token_attentions("Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
+# ['her', 'Cheryl', 'Pauline'], [57, 39, 42]))
