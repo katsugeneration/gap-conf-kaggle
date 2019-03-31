@@ -1,6 +1,7 @@
 import pandas
 import utils
 import gpt2_estimator
+import bert_estimator
 import pickle
 from collections import namedtuple
 import itertools
@@ -455,6 +456,12 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
         X3.append(_get_dependency_labels(words, indexes, targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
         X4.append(_get_gpt2_likelihood(words, indexes))
 
+    texts = [df['Text'][i] for i in range(len(df))]
+    words = [[words[j].text.replace('`', '') for j in indexes] for words, indexes in data]
+    indexes = [indexes for words, indexes in data]
+    X5 = bert_estimator._get_token_attentions(texts, words, indexes)
+    X5 = np.array(X5)
+
     X = np.array(X)
     X2 = np.array(X2)
     featur_len = int(X.shape[1] / 3)
@@ -470,17 +477,11 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
         X_pr - X_b,
         X_pr * X_a,
         X_pr * X_b,
-        np.absolute(X_pr - X_a).sum(axis=1, keepdims=True) - np.absolute(X_pr - X_b).sum(axis=1, keepdims=True),
-        np.absolute(X_pr * X_a).sum(axis=1, keepdims=True) - np.absolute(X_pr * X_b).sum(axis=1, keepdims=True),
         X2_pr - X2_a,
         X2_pr - X2_b,
         X2_pr * X2_a,
         X2_pr * X2_b,
-        np.sum(np.absolute(X2_pr - X2_a), axis=1, keepdims=True) - np.absolute(X2_pr - X2_b).sum(axis=1, keepdims=True),
-        np.absolute(X2_pr * X2_a).sum(axis=1, keepdims=True) - np.absolute(X2_pr * X2_b).sum(axis=1, keepdims=True),
-        _get_sexial_labels(df),
-        X3,
-        X4,
+        X5,
         (df['Pronoun-offset'] - df['A-offset']).values.reshape(len(X), 1),
         (df['Pronoun-offset'] - df['B-offset']).values.reshape(len(X), 1)
     ), axis=1)
@@ -550,6 +551,7 @@ def train(use_preprocessdata=True):
 
 def evaluate(test_data, use_preprocessdata=True):
     gpt2_estimator.build()
+    bert_estimator.build()
     train()
     X, Y = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
     with open('stanfordnlp_model.pkl', 'rb') as f:
