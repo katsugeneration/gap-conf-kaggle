@@ -404,6 +404,13 @@ def _get_gpt2_likelihood(words, indexes):
     return [A_rate1, B_rate1, A_rate2, B_rate2]
 
 
+def _bert_attentions(df, data):
+    texts = [df['Text'][i] for i in range(len(df))]
+    words = [[words[j].text.replace('`', '') for j in indexes] for words, indexes in data]
+    indexes = [indexes for words, indexes in data]
+    return bert_estimator._get_token_attentions(texts, words, indexes)
+
+
 def _load_data(df, use_preprocessdata=False, save_path=None):
     """Load preprocess task speccific data.
     Args:
@@ -456,10 +463,7 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
         X3.append(_get_dependency_labels(words, indexes, targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
         X4.append(_get_gpt2_likelihood(words, indexes))
 
-    texts = [df['Text'][i] for i in range(len(df))]
-    words = [[words[j].text.replace('`', '') for j in indexes] for words, indexes in data]
-    indexes = [indexes for words, indexes in data]
-    X5 = bert_estimator._get_token_attentions(texts, words, indexes)
+    X5 = _bert_attentions(df, data)
     X5 = np.array(X5)
 
     X = np.array(X)
@@ -481,6 +485,7 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
         X2_pr - X2_b,
         X2_pr * X2_a,
         X2_pr * X2_b,
+        X3,
         X5,
         (df['Pronoun-offset'] - df['A-offset']).values.reshape(len(X), 1),
         (df['Pronoun-offset'] - df['B-offset']).values.reshape(len(X), 1)
@@ -535,7 +540,7 @@ def train(use_preprocessdata=True):
         study_name='gap-conf-kaggle',
         pruner=optuna.pruners.MedianPruner(),
         sampler=optuna.samplers.TPESampler(seed=0))
-    study.optimize(objective, n_trials=100, n_jobs=-1)
+    study.optimize(objective, n_trials=500, n_jobs=-1)
     print("Best Params", study.best_params)
     print("Best Validation Value", study.best_value)
 
