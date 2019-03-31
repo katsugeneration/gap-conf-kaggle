@@ -5,6 +5,8 @@
 import os
 import numpy as np
 import tensorflow as tf
+from sklearn.metrics.pairwise import cosine_similarity
+from scipy import sparse
 import importlib.util
 
 # Load BERT module
@@ -124,9 +126,15 @@ def model_fn_builder(bert_config, init_checkpoint, use_tpu, use_one_hot_embeddin
         tf.train.init_from_checkpoint(init_checkpoint, assignment_map)
 
         all_attention_heads = model.get_all_attention_heads()
+        all_layers = model.get_all_encoder_layers()
+
+        predictions = {
+            "all_attention_heads": tf.convert_to_tensor(all_attention_heads),
+            "all_layers": tf.transpose(all_layers, (1, 0, 2, 3))
+        }
 
         output_spec = tf.contrib.tpu.TPUEstimatorSpec(
-            mode=mode, predictions=tf.convert_to_tensor(all_attention_heads),
+            mode=mode, predictions=predictions,
             scaffold_fn=scaffold_fn)
         return output_spec
 
@@ -243,10 +251,10 @@ def _get_token_attentions(text, words, indexes):
         attentions ([List[Float]]): word to word attention values. shape is (num_layers, len(words), len(words), num_heads)
     """
     targets = [sorted(enumerate(zip(w, indices)), key=lambda x: x[1][1]) for w, indices in zip(words, indexes)]
-    attention_values, tokens = predict(text)
+    predictions, tokens = predict(text)
 
     all_attentions = []
-    for k, avar in enumerate(attention_values):
+    for k, prediction in enumerate(predictions):
         before = 0
         word_indeces = [0] * len(words[k])
         for i, (word, index) in targets[k]:
@@ -256,12 +264,15 @@ def _get_token_attentions(text, words, indexes):
 
         attentions = []
         for i in word_indeces:
-            attentions.append(avar[:, word_indeces, i:i+1])
+            attentions.append(prediction['all_attention_heads'][:, word_indeces, i:i+1])
         attentions = np.transpose(attentions, (3, 1, 2, 0, 4))[0].flatten()
-        all_attentions.append(attentions)
+        layers = prediction['all_layers'][:, word_indeces]
+        layers_cos1 = cosine_similarity(layers[-1, 0].reshape((1, -1)), layers[-1, 1].reshape((1, -1))).flatten()
+        layers_cos2 = cosine_similarity(layers[-1, 0].reshape((1, -1)), layers[-1, 2].reshape((1, -1))).flatten()
+        all_attentions.append(np.concatenate([attentions, layers[-1].flatten(), layers_cos1, layers_cos2]))
     return all_attentions
 
 
 # build()
-# print(_get_token_attentions("Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline.",
-# ['her', 'Cheryl', 'Pauline'], [57, 39, 42]))
+# print(_get_token_attentions(["Zoe Telford -- played the police officer girlfriend of Simon, Maggie. Dumped by Simon in the final episode of series 1, after he slept with Jenny, and is not seen again. Phoebe Thomas played Cheryl Cassidy, Pauline's friend and also a year 11 pupil in Simon's class. Dumped her boyfriend following Simon's advice after he wouldn't have sex with her but later realised this was due to him catching crabs off her friend Pauline."],
+# [['her', 'Cheryl', 'Pauline']], [[57, 39, 42]]))

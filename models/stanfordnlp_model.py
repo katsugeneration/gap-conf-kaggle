@@ -540,7 +540,7 @@ def train(use_preprocessdata=True):
         study_name='gap-conf-kaggle',
         pruner=optuna.pruners.MedianPruner(),
         sampler=optuna.samplers.TPESampler(seed=0))
-    study.optimize(objective, n_trials=500, n_jobs=-1)
+    study.optimize(objective, n_trials=100, n_jobs=-1)
     print("Best Params", study.best_params)
     print("Best Validation Value", study.best_value)
 
