@@ -5,6 +5,8 @@ import optuna
 import pandas
 import numpy as np
 import tensorflow as tf
+import bert_estimator
+import gpt2_estimator
 from models import stanfordnlp_model
 
 
@@ -19,10 +21,10 @@ class MLP(tf.keras.Model):
                  **kwargs):
         super(MLP, self).__init__()
         self.hidden_num = hidden_num
+        self.drop_rate = drop_rate
         self.dense1 = tf.keras.layers.Dense(
             hidden_dims,
-            use_bias=True,
-            kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
+            use_bias=True)
         self.bn1 = tf.keras.layers.BatchNormalization()
 
         self.hidden_layers = []
@@ -31,25 +33,25 @@ class MLP(tf.keras.Model):
         for i in range(self.hidden_num):
             self.hidden_layers.append(tf.keras.layers.Dense(
                 hidden_dims,
-                use_bias=True,
-                kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight)))
+                use_bias=True))
             self.hidden_bns.append(tf.keras.layers.BatchNormalization())
 
         self.dense4 = tf.keras.layers.Dense(
             last_dims,
             activation=tf.nn.softmax,
-            use_bias=True,
-            kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
+            use_bias=True)
 
     def call(self, inputs):
         x = self.dense1(inputs)
-        x = self.bn1(x)
+        # x = self.bn1(x)
         x = tf.nn.tanh(x)
+        x = tf.keras.layers.Dropout(self.drop_rate)(x)
         for i in range(self.hidden_num):
-            x = self.hidden_layers[i](x) + x
-            x = self.hidden_bns[i](x)
-            x = tf.nn.tanh(x)
-        x = tf.nn.tanh(x)
+            old = x
+            x = self.hidden_layers[i](x)
+            # x = self.hidden_bns[i](x)
+            x = tf.nn.tanh(x) + old
+            x = tf.keras.layers.Dropout(self.drop_rate)(x)
         return self.dense4(x)
 
 
@@ -74,11 +76,11 @@ def train(use_preprocessdata=True):
         hidden_dims = trial.suggest_int('hidden_dims', 100, 300)
         hidden_num = trial.suggest_int('hidden_num', 1, 10)
         drop_rate = trial.suggest_uniform('drop_rate', 0.1, 1.0)
-        l1_weight = trial.suggest_loguniform('l1_weight', 0.0001, 0.01)
-        l2_weight = trial.suggest_loguniform('l2_weight', 0.0001, 0.01)
+        # l1_weight = 0.0  # trial.suggest_loguniform('l1_weight', 0.0001, 0.01)
+        # l2_weight = trial.suggest_loguniform('l2_weight', 0.0001, 0.01)
         lr = trial.suggest_loguniform('lr', 0.001, 0.1)
         batch_size = trial.suggest_int('batch_size', 32, 128)
-        epochs = trial.suggest_int('epochs', 50, 200)
+        # epochs = trial.suggest_int('epochs', 50, 200)
 
         def _on_epoch_end(epoch, logs=None):
             """Call for pruning when end epoch.
@@ -93,6 +95,7 @@ def train(use_preprocessdata=True):
             # Handle pruning based on the intermediate value.
             if epoch > 10 and trial.should_prune(epoch):
                 print(epoch, logs)
+                tf.keras.backend.clear_session()
                 raise optuna.structs.TrialPruned()
 
         def _on_train_end(logs=None):
@@ -113,7 +116,7 @@ def train(use_preprocessdata=True):
             print('Eval Metrics:', evals)
 
         set_seed()
-        model = MLP(hidden_dims, hidden_num, 3, drop_rate, l1_weight, l2_weight)
+        model = MLP(hidden_dims, hidden_num, 3, drop_rate)
         model.compile(
             tf.keras.optimizers.Adam(lr),
             loss='categorical_crossentropy',
@@ -124,7 +127,7 @@ def train(use_preprocessdata=True):
             x=X,
             y=tf.keras.utils.to_categorical(Y, num_classes=3),
             batch_size=batch_size,
-            epochs=epochs,
+            epochs=1000,
             workers=4,
             validation_data=(validation_X, tf.keras.utils.to_categorical(validation_Y, num_classes=3)),
             callbacks=[tf.keras.callbacks.LambdaCallback(on_epoch_end=_on_epoch_end, on_train_end=_on_train_end)],
@@ -134,6 +137,7 @@ def train(use_preprocessdata=True):
             validation_X,
             tf.keras.utils.to_categorical(validation_Y, num_classes=3),
             verbose=0)
+        tf.keras.backend.clear_session()
         return 2 * (1 - evals[1]) + evals[2]
 
     study = optuna.create_study(
@@ -155,7 +159,7 @@ def train(use_preprocessdata=True):
         np.concatenate([X, validation_X]),
         tf.keras.utils.to_categorical(np.concatenate([Y, validation_Y]), num_classes=3),
         batch_size=study.best_params['batch_size'],
-        epochs=study.best_params['epochs'],
+        epochs=1000,
         workers=4,
         verbose=0)
 
@@ -167,9 +171,12 @@ def train(use_preprocessdata=True):
             tf.keras.utils.to_categorical(Y, num_classes=3),
             verbose=0)
     print("Train Accuracy:", evals[1])
+    tf.keras.backend.clear_session()
 
 
 def evaluate(test_data, use_preprocessdata=True):
+    gpt2_estimator.build()
+    bert_estimator.build()
     train()
     X, Y = stanfordnlp_model._preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
 
