@@ -18,7 +18,8 @@ spec = importlib.util.spec_from_file_location("tokenization", os.path.join(gpt2_
 tokenization = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tokenization)
 
-BERT_PATH = "multi_cased_L-12_H-768_A-12/"
+# BERT_PATH = "multi_cased_L-12_H-768_A-12/"
+BERT_PATH = "uncased_L-12_H-768_A-12/"
 seq_length = 512
 estimator = None
 tokenizer = None
@@ -238,6 +239,67 @@ def predict(text):
 
     predictions = estimator.predict(input_fn, yield_single_examples=True)
     return predictions, [f.tokens for f in features]
+
+
+def embed_by_bert(df):
+    def count_char(text, offset):
+        count = 0
+        for pos in range(offset):
+            if text[pos] != " ":
+                count += 1
+        return count
+
+    def candidate_length(candidate):
+        count = 0
+        for i in range(len(candidate)):
+            if candidate[i] != " ":
+                count += 1
+        return count
+
+    def count_token_length_special(token):
+        count = 0
+        special_token = ["#", " "]
+        for i in range(len(token)):
+            if token[i] not in special_token:
+                count += 1
+        return count
+
+    text = df['Text']
+    predictions, tokens = predict(text)
+    all_embedings = []
+
+    for i, prediction in enumerate(predictions):
+        P_char_start = count_char(df.loc[i, 'Text'], df.loc[i, 'Pronoun-offset'])
+        A_char_start = count_char(df.loc[i, 'Text'], df.loc[i, 'A-offset'])
+        B_char_start = count_char(df.loc[i, 'Text'], df.loc[i, 'B-offset'])
+        A_length = candidate_length(df.loc[i, 'A'])
+        B_length = candidate_length(df.loc[i, 'B'])
+
+        emb_A = np.zeros(768)
+        emb_B = np.zeros(768)
+        emb_P = np.zeros(768)
+
+        char_count = 0
+        cnt_A, cnt_B = 0, 0
+
+        for j, token in enumerate(tokens[i]):
+            if j < 1:
+                continue
+            token_length = count_token_length_special(token)
+            if char_count == P_char_start:
+                emb_P += np.asarray(prediction['all_layers'][-1, j])
+            if char_count in range(A_char_start, A_char_start+A_length):
+                emb_A += np.asarray(prediction['all_layers'][-1, j])
+                cnt_A += 1
+            if char_count in range(B_char_start, B_char_start+B_length):
+                emb_B += np.asarray(prediction['all_layers'][-1, j])
+                cnt_B += 1
+            char_count += token_length
+
+        emb_A /= cnt_A
+        emb_B /= cnt_B
+        all_embedings.append(np.concatenate([emb_P, emb_A, emb_B], -1))
+    return all_embedings
 
 
 def _get_token_attentions(text, words, indexes):
