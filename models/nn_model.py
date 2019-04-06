@@ -10,6 +10,10 @@ import gpt2_estimator
 from models import stanfordnlp_model
 
 
+VECTOR_SIZE = 768
+SEED = 1
+
+
 class MLP(tf.keras.Model):
     def __init__(self,
                  hidden_dims=100,
@@ -55,32 +59,84 @@ class MLP(tf.keras.Model):
         return self.dense4(x)
 
 
+class ScoreRanker(tf.keras.Model):
+    def __init__(self,
+                 hidden_dims=150,
+                 drop_rate=0.2,
+                 l1_weight=0.01,
+                 l2_weight=0.01,
+                 **kwargs):
+        super(ScoreRanker, self).__init__()
+        self.drop_rate = drop_rate
+        self.dense1 = tf.keras.layers.Dense(
+            hidden_dims,
+            use_bias=True)
+            # kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
+        self.dropout = tf.keras.layers.Dropout(self.drop_rate)
+        self.out = tf.keras.layers.Dense(1)
+
+    def call(self, inputs):
+        pa = inputs[:, :VECTOR_SIZE] * inputs[:, VECTOR_SIZE:VECTOR_SIZE*2]
+        pb = inputs[:, :VECTOR_SIZE] * inputs[:, VECTOR_SIZE*2:]
+
+        pa = tf.concat([inputs[:, :VECTOR_SIZE], inputs[:, VECTOR_SIZE:VECTOR_SIZE*2], pa], -1)
+        pb = tf.concat([inputs[:, :VECTOR_SIZE], inputs[:, VECTOR_SIZE*2:], pb], -1)
+
+        pa = self.dense1(pa)
+        pa = tf.nn.relu(pa)
+        pa = self.dropout(pa)
+        pa_score = self.out(pa)
+
+        pb = self.dense1(pb)
+        pb = tf.nn.relu(pb)
+        pb = self.dropout(pb)
+        pb_score = self.out(pb)
+
+        outputs = tf.nn.softmax(tf.concat([pa_score, pb_score, tf.zeros_like(pa_score)], -1))
+        return outputs
+
+
 def set_seed():
-    os.environ['PYTHONHASHSEED'] = '0'
-    random.seed(0)
-    np.random.seed(0)
+    os.environ['PYTHONHASHSEED'] = str(SEED)
+    random.seed(SEED)
+    np.random.seed(SEED)
     session_conf = tf.ConfigProto()
-    tf.set_random_seed(0)
+    tf.set_random_seed(SEED)
     sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
     tf.keras.backend.set_session(sess)
     return sess
 
 
+def _preprocess_data(df, use_preprocessdata=False, save_path=None):
+    """Preprocess task speccific pipeline.
+    Args:
+        df (DataFrame): target pandas DataFrame object.
+        use_preprocessdata (bool): Wheter or not to use local preprocess file loading
+        save_path (str): local preprocess file path
+    Return:
+        X (array): explanatory variables in task. shape is (n_sumples, n_features)
+        Y (array): objective variables in task. shape is (n_sumples, 1)
+    """
+    data = stanfordnlp_model._load_data(df, use_preprocessdata, save_path)
+    X = bert_estimator.embed_by_bert(df)
+    X = np.array(X)
+    Y = stanfordnlp_model._get_classify_labels(df)
+    return X, Y
+
+
 def train(use_preprocessdata=True):
     df = pandas.read_csv('dataset/gap-test.tsv', sep='\t')
-    X, Y = stanfordnlp_model._preprocess_data(df, use_preprocessdata=use_preprocessdata, save_path='preprocess_traindata.pkl')
+    X, Y = _preprocess_data(df, use_preprocessdata=use_preprocessdata, save_path='preprocess_traindata.pkl')
     validation_df = pandas.read_csv('dataset/gap-validation.tsv', sep='\t')
-    validation_X, validation_Y = stanfordnlp_model._preprocess_data(validation_df, use_preprocessdata=use_preprocessdata, save_path='preprocess_valdata.pkl')
+    validation_X, validation_Y = _preprocess_data(validation_df, use_preprocessdata=use_preprocessdata, save_path='preprocess_valdata.pkl')
 
     def objective(trial):
         hidden_dims = trial.suggest_int('hidden_dims', 100, 300)
-        hidden_num = trial.suggest_int('hidden_num', 1, 10)
         drop_rate = trial.suggest_uniform('drop_rate', 0.1, 1.0)
         # l1_weight = 0.0  # trial.suggest_loguniform('l1_weight', 0.0001, 0.01)
         # l2_weight = trial.suggest_loguniform('l2_weight', 0.0001, 0.01)
-        lr = trial.suggest_loguniform('lr', 0.001, 0.1)
-        batch_size = trial.suggest_int('batch_size', 32, 128)
-        # epochs = trial.suggest_int('epochs', 50, 200)
+        lr = 0.001  # trial.suggest_loguniform('lr', 0.001, 0.001)
+        batch_size = 128  # trial.suggest_int('batch_size', 32, 128)
 
         def _on_epoch_end(epoch, logs=None):
             """Call for pruning when end epoch.
@@ -89,7 +145,7 @@ def train(use_preprocessdata=True):
                 epoch (int): number of epoch count.
                 logs (dict): epoch metrics.
             """
-            intermediate_value = 2 * (1 - logs['val_acc']) + logs['val_loss']
+            intermediate_value = logs['val_loss']
             trial.report(intermediate_value, epoch)
 
             # Handle pruning based on the intermediate value.
@@ -116,13 +172,14 @@ def train(use_preprocessdata=True):
             print('Eval Metrics:', evals)
 
         set_seed()
-        model = MLP(hidden_dims, hidden_num, 3, drop_rate)
+        model = ScoreRanker(hidden_dims, drop_rate)
         model.compile(
             tf.keras.optimizers.Adam(lr),
             loss='categorical_crossentropy',
             metrics=['acc', 'categorical_crossentropy']
         )
 
+        early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", mode="min", patience=100)
         model.fit(
             x=X,
             y=tf.keras.utils.to_categorical(Y, num_classes=3),
@@ -130,7 +187,7 @@ def train(use_preprocessdata=True):
             epochs=1000,
             workers=4,
             validation_data=(validation_X, tf.keras.utils.to_categorical(validation_Y, num_classes=3)),
-            callbacks=[tf.keras.callbacks.LambdaCallback(on_epoch_end=_on_epoch_end, on_train_end=_on_train_end)],
+            callbacks=[tf.keras.callbacks.LambdaCallback(on_train_end=_on_train_end), early_stop],
             verbose=0)
 
         evals = model.evaluate(
@@ -138,29 +195,32 @@ def train(use_preprocessdata=True):
             tf.keras.utils.to_categorical(validation_Y, num_classes=3),
             verbose=0)
         tf.keras.backend.clear_session()
-        return 2 * (1 - evals[1]) + evals[2]
+        return evals[2]
 
     study = optuna.create_study(
         study_name='gap-conf-kaggle',
         pruner=optuna.pruners.MedianPruner(),
-        sampler=optuna.samplers.TPESampler(seed=0))
+        sampler=optuna.samplers.TPESampler(seed=SEED))
     study.optimize(objective, n_trials=100, n_jobs=1)
     print("Best Params", study.best_params)
     print("Best Validation Value", study.best_value)
 
     set_seed()
-    model = MLP(last_dims=3, **study.best_params)
+    early_stop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", mode="min", patience=100)
+    model = ScoreRanker(**study.best_params)
     model.compile(
-        tf.keras.optimizers.Adam(lr=study.best_params['lr']),
+        tf.keras.optimizers.Adam(0.001),
         loss='categorical_crossentropy',
         metrics=['acc', 'categorical_crossentropy']
     )
     model.fit(
-        np.concatenate([X, validation_X]),
-        tf.keras.utils.to_categorical(np.concatenate([Y, validation_Y]), num_classes=3),
-        batch_size=study.best_params['batch_size'],
+        x=X,
+        y=tf.keras.utils.to_categorical(Y, num_classes=3),
+        batch_size=128,
         epochs=1000,
         workers=4,
+        validation_data=(validation_X, tf.keras.utils.to_categorical(validation_Y, num_classes=3)),
+        callbacks=[early_stop],
         verbose=0)
 
     model.save_weights('model.h5')
@@ -175,17 +235,17 @@ def train(use_preprocessdata=True):
 
 
 def evaluate(test_data, use_preprocessdata=True):
-    gpt2_estimator.build()
+    # gpt2_estimator.build()
     bert_estimator.build()
     train()
-    X, Y = stanfordnlp_model._preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
+    X, Y = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
 
     set_seed()
     with open('model.json', 'r') as f:
         params = json.load(f)
-    model = MLP(last_dims=3, **params)
+    model = ScoreRanker(**params)
     model.compile(
-        tf.keras.optimizers.Adam(lr=params['lr']),
+        tf.keras.optimizers.Adam(0.001),
         loss='categorical_crossentropy',
         metrics=['acc', 'categorical_crossentropy']
     )
