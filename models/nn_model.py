@@ -28,7 +28,7 @@ class MLP(tf.keras.Model):
         super(MLP, self).__init__()
         self.hidden_num = hidden_num
         self.drop_rate = drop_rate
-        self.dense1 = tf.keras.layers.Dense(
+        self.bert_embedings = tf.keras.layers.Dense(
             hidden_dims,
             use_bias=True)
         self.bn1 = tf.keras.layers.BatchNormalization()
@@ -48,7 +48,7 @@ class MLP(tf.keras.Model):
             use_bias=True)
 
     def call(self, inputs):
-        x = self.dense1(inputs)
+        x = self.bert_embedings(inputs)
         # x = self.bn1(x)
         x = tf.nn.tanh(x)
         x = tf.keras.layers.Dropout(self.drop_rate)(x)
@@ -71,16 +71,21 @@ class ScoreRanker(tf.keras.Model):
                  **kwargs):
         super(ScoreRanker, self).__init__()
         self.drop_rate = drop_rate
-        self.dense1 = tf.keras.layers.Dense(
+        self.bert_embedings = tf.keras.layers.Dense(
             hidden_dims,
             use_bias=True,
             kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
-        self.dense2 = tf.keras.layers.Dense(
+        self.pos_embedings = tf.keras.layers.Dense(
+            emb_dims,
+            use_bias=True,
+            kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
+        self.dep_embedings = tf.keras.layers.Dense(
             emb_dims,
             use_bias=True,
             kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
         self.dropout = tf.keras.layers.Dropout(self.drop_rate)
-        self.out = tf.keras.layers.Dense(1)
+        self.out = tf.keras.layers.Dense(1,
+            kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
 
     def call(self, inputs):
         start_bert = (POS_WITH_POSITION_SIZE + POS_WITH_DEP_SIZE) * 3
@@ -90,6 +95,10 @@ class ScoreRanker(tf.keras.Model):
         bert_a = inputs[:, start_bert + BERT_VECTOR_SIZE:start_bert + BERT_VECTOR_SIZE*2]
         bert_b = inputs[:, start_bert + BERT_VECTOR_SIZE*2:start_bert + BERT_VECTOR_SIZE*3]
 
+        pos_p = inputs[:, :POS_WITH_POSITION_SIZE]
+        pos_a = inputs[:, POS_WITH_POSITION_SIZE:POS_WITH_POSITION_SIZE * 2]
+        pos_b = inputs[:, POS_WITH_POSITION_SIZE * 2:POS_WITH_POSITION_SIZE * 3]
+
         dep_p = inputs[:, start_dep:start_dep + POS_WITH_DEP_SIZE]
         dep_a = inputs[:, start_dep + POS_WITH_DEP_SIZE:start_dep + POS_WITH_DEP_SIZE * 2]
         dep_b = inputs[:, start_dep + POS_WITH_DEP_SIZE * 2:start_dep + POS_WITH_DEP_SIZE * 3]
@@ -97,15 +106,17 @@ class ScoreRanker(tf.keras.Model):
         pa = tf.concat([bert_p, bert_a, bert_p * bert_a], -1)
         pb = tf.concat([bert_p, bert_b, bert_p * bert_b], -1)
 
-        pa = self.dense1(pa)
-        dep_pa = self.dense2(tf.concat([dep_p, dep_a, dep_p * dep_a], -1))
-        pa = tf.nn.relu(tf.concat([pa, dep_pa], -1))
+        pa = self.bert_embedings(pa)
+        pos_pa = self.pos_embedings(tf.concat([pos_p, pos_a, pos_p * pos_a], -1))
+        dep_pa = self.dep_embedings(tf.concat([dep_p, dep_a, dep_p * dep_a], -1))
+        pa = tf.nn.relu(tf.concat([pa, pos_pa, dep_pa], -1))
         pa = self.dropout(pa)
         pa_score = self.out(pa)
 
-        pb = self.dense1(pb)
-        dep_pb = self.dense2(tf.concat([dep_p, dep_b, dep_p * dep_b], -1))
-        pb = tf.nn.relu(tf.concat([pb, dep_pb], -1))
+        pb = self.bert_embedings(pb)
+        pos_pb = self.pos_embedings(tf.concat([pos_p, pos_b, pos_p * pos_b], -1))
+        dep_pb = self.dep_embedings(tf.concat([dep_p, dep_b, dep_p * dep_b], -1))
+        pb = tf.nn.relu(tf.concat([pb, pos_pb, dep_pb], -1))
         pb = self.dropout(pb)
         pb_score = self.out(pb)
 
