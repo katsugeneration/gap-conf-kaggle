@@ -275,9 +275,9 @@ def embed_by_bert(df):
         A_length = candidate_length(df.loc[i, 'A'])
         B_length = candidate_length(df.loc[i, 'B'])
 
-        emb_A = np.zeros(768)
-        emb_B = np.zeros(768)
-        emb_P = np.zeros(768)
+        emb_A = np.zeros((2, 768))
+        emb_B = np.zeros((2, 768))
+        emb_P = np.zeros((2, 768))
 
         char_count = 0
         cnt_A, cnt_B = 0, 0
@@ -287,18 +287,18 @@ def embed_by_bert(df):
                 continue
             token_length = count_token_length_special(token)
             if char_count == P_char_start:
-                emb_P += np.asarray(prediction['all_layers'][-1, j])
+                emb_P += np.asarray(prediction['all_layers'][-2:, j])
             if char_count in range(A_char_start, A_char_start+A_length):
-                emb_A += np.asarray(prediction['all_layers'][-1, j])
+                emb_A += np.asarray(prediction['all_layers'][-2:, j])
                 cnt_A += 1
             if char_count in range(B_char_start, B_char_start+B_length):
-                emb_B += np.asarray(prediction['all_layers'][-1, j])
+                emb_B += np.asarray(prediction['all_layers'][-2:, j])
                 cnt_B += 1
             char_count += token_length
 
         emb_A /= cnt_A
         emb_B /= cnt_B
-        all_embedings.append(np.concatenate([emb_P, emb_A, emb_B], -1))
+        all_embedings.append(np.concatenate([emb_P.flatten(), emb_A.flatten(), emb_B.flatten()], -1))
     return all_embedings
 
 

@@ -12,7 +12,7 @@ from models import stanfordnlp_model
 
 POS_WITH_POSITION_SIZE = len(stanfordnlp_model.cv_position.vocabulary_)
 POS_WITH_DEP_SIZE = len(stanfordnlp_model.cv_dependencies.vocabulary_)
-BERT_VECTOR_SIZE = 768
+BERT_VECTOR_SIZE = 768 * 2
 SEED = 1
 
 
@@ -93,19 +93,19 @@ class ScoreRanker(tf.keras.Model):
         dep_p = inputs[:, start_dep:start_dep + POS_WITH_DEP_SIZE]
         dep_a = inputs[:, start_dep + POS_WITH_DEP_SIZE:start_dep + POS_WITH_DEP_SIZE * 2]
         dep_b = inputs[:, start_dep + POS_WITH_DEP_SIZE * 2:start_dep + POS_WITH_DEP_SIZE * 3]
-        dep_pa = self.dense2(tf.concat([dep_p, dep_a, dep_p * dep_a], -1))
-        dep_pb = self.dense2(tf.concat([dep_p, dep_b, dep_p * dep_b], -1))
 
-        pa = tf.concat([bert_p, bert_a, bert_p * bert_a, dep_pa], -1)
-        pb = tf.concat([bert_p, bert_b, bert_p * bert_b, dep_pb], -1)
+        pa = tf.concat([bert_p, bert_a, bert_p * bert_a], -1)
+        pb = tf.concat([bert_p, bert_b, bert_p * bert_b], -1)
 
         pa = self.dense1(pa)
-        pa = tf.nn.relu(pa)
+        dep_pa = self.dense2(tf.concat([dep_p, dep_a, dep_p * dep_a], -1))
+        pa = tf.nn.relu(tf.concat([pa, dep_pa], -1))
         pa = self.dropout(pa)
         pa_score = self.out(pa)
 
         pb = self.dense1(pb)
-        pb = tf.nn.relu(pb)
+        dep_pb = self.dense2(tf.concat([dep_p, dep_b, dep_p * dep_b], -1))
+        pb = tf.nn.relu(tf.concat([pb, dep_pb], -1))
         pb = self.dropout(pb)
         pb_score = self.out(pb)
 
