@@ -90,12 +90,14 @@ class ScoreRanker(tf.keras.Model):
         bert_a = inputs[:, start_bert + BERT_VECTOR_SIZE:start_bert + BERT_VECTOR_SIZE*2]
         bert_b = inputs[:, start_bert + BERT_VECTOR_SIZE*2:start_bert + BERT_VECTOR_SIZE*3]
 
-        dep_p = self.dense2(inputs[:, start_dep:start_dep + POS_WITH_DEP_SIZE])
-        dep_a = self.dense2(inputs[:, start_dep + POS_WITH_DEP_SIZE:start_dep + POS_WITH_DEP_SIZE * 2])
-        dep_b = self.dense2(inputs[:, start_dep + POS_WITH_DEP_SIZE * 2:start_dep + POS_WITH_DEP_SIZE * 3])
+        dep_p = inputs[:, start_dep:start_dep + POS_WITH_DEP_SIZE]
+        dep_a = inputs[:, start_dep + POS_WITH_DEP_SIZE:start_dep + POS_WITH_DEP_SIZE * 2]
+        dep_b = inputs[:, start_dep + POS_WITH_DEP_SIZE * 2:start_dep + POS_WITH_DEP_SIZE * 3]
+        dep_pa = self.dense2(tf.concat([dep_p, dep_a, dep_p * dep_a], -1))
+        dep_pb = self.dense2(tf.concat([dep_p, dep_b, dep_p * dep_b], -1))
 
-        pa = tf.concat([bert_p, bert_a, bert_p * bert_a, dep_p, dep_a, dep_p * dep_a], -1)
-        pb = tf.concat([bert_p, bert_b, bert_p * bert_b, dep_p, dep_b, dep_p * dep_b], -1)
+        pa = tf.concat([bert_p, bert_a, bert_p * bert_a, dep_pa], -1)
+        pb = tf.concat([bert_p, bert_b, bert_p * bert_b, dep_pb], -1)
 
         pa = self.dense1(pa)
         pa = tf.nn.relu(pa)
