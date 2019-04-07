@@ -10,7 +10,9 @@ import gpt2_estimator
 from models import stanfordnlp_model
 
 
-VECTOR_SIZE = 768
+POS_WITH_POSITION_SIZE = len(stanfordnlp_model.cv_position.vocabulary_)
+POS_WITH_DEP_SIZE = len(stanfordnlp_model.cv_dependencies.vocabulary_)
+BERT_VECTOR_SIZE = 768
 SEED = 1
 
 
@@ -65,22 +67,35 @@ class ScoreRanker(tf.keras.Model):
                  drop_rate=0.2,
                  l1_weight=0.01,
                  l2_weight=0.01,
+                 emb_dims=30,
                  **kwargs):
         super(ScoreRanker, self).__init__()
         self.drop_rate = drop_rate
         self.dense1 = tf.keras.layers.Dense(
             hidden_dims,
-            use_bias=True)
-            # kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
+            use_bias=True,
+            kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
+        self.dense2 = tf.keras.layers.Dense(
+            emb_dims,
+            use_bias=True,
+            kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
         self.dropout = tf.keras.layers.Dropout(self.drop_rate)
         self.out = tf.keras.layers.Dense(1)
 
     def call(self, inputs):
-        pa = inputs[:, :VECTOR_SIZE] * inputs[:, VECTOR_SIZE:VECTOR_SIZE*2]
-        pb = inputs[:, :VECTOR_SIZE] * inputs[:, VECTOR_SIZE*2:]
+        start_bert = (POS_WITH_POSITION_SIZE + POS_WITH_DEP_SIZE) * 3
+        start_dep = POS_WITH_POSITION_SIZE * 3
 
-        pa = tf.concat([inputs[:, :VECTOR_SIZE], inputs[:, VECTOR_SIZE:VECTOR_SIZE*2], pa], -1)
-        pb = tf.concat([inputs[:, :VECTOR_SIZE], inputs[:, VECTOR_SIZE*2:], pb], -1)
+        bert_p = inputs[:, start_bert:start_bert + BERT_VECTOR_SIZE]
+        bert_a = inputs[:, start_bert + BERT_VECTOR_SIZE:start_bert + BERT_VECTOR_SIZE*2]
+        bert_b = inputs[:, start_bert + BERT_VECTOR_SIZE*2:start_bert + BERT_VECTOR_SIZE*3]
+
+        dep_p = self.dense2(inputs[:, start_dep:start_dep + POS_WITH_DEP_SIZE])
+        dep_a = self.dense2(inputs[:, start_dep + POS_WITH_DEP_SIZE:start_dep + POS_WITH_DEP_SIZE * 2])
+        dep_b = self.dense2(inputs[:, start_dep + POS_WITH_DEP_SIZE * 2:start_dep + POS_WITH_DEP_SIZE * 3])
+
+        pa = tf.concat([bert_p, bert_a, bert_p * bert_a, dep_p, dep_a, dep_p * dep_a], -1)
+        pb = tf.concat([bert_p, bert_b, bert_p * bert_b, dep_p, dep_b, dep_p * dep_b], -1)
 
         pa = self.dense1(pa)
         pa = tf.nn.relu(pa)
@@ -118,8 +133,18 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
         Y (array): objective variables in task. shape is (n_sumples, 1)
     """
     data = stanfordnlp_model._load_data(df, use_preprocessdata, save_path)
-    X = bert_estimator.embed_by_bert(df)
-    X = np.array(X)
+    X = []
+    X2 = []
+    for i, (words, indexes) in enumerate(data):
+        X.append(
+            stanfordnlp_model._vectorise_bag_of_pos_with_position(words, indexes, stanfordnlp_model.DEFAULT_WINDOW_SIZE,
+                                                                  targets=[df['Pronoun'][i], df['A'][i], df['B'][i]]))
+        X2.append(stanfordnlp_model._vectorise_bag_of_pos_with_dependency(words, indexes))
+    X5 = bert_estimator.embed_by_bert(df)
+    X5 = np.array(X5)
+    X = np.concatenate([
+        X, X2, X5
+    ], axis=-1)
     Y = stanfordnlp_model._get_classify_labels(df)
     return X, Y
 
@@ -133,10 +158,11 @@ def train(use_preprocessdata=True):
     def objective(trial):
         hidden_dims = trial.suggest_int('hidden_dims', 100, 300)
         drop_rate = trial.suggest_uniform('drop_rate', 0.1, 1.0)
-        # l1_weight = 0.0  # trial.suggest_loguniform('l1_weight', 0.0001, 0.01)
-        # l2_weight = trial.suggest_loguniform('l2_weight', 0.0001, 0.01)
-        lr = 0.001  # trial.suggest_loguniform('lr', 0.001, 0.001)
-        batch_size = 128  # trial.suggest_int('batch_size', 32, 128)
+        l1_weight = trial.suggest_loguniform('l1_weight', 0.001, 0.1)
+        l2_weight = trial.suggest_loguniform('l2_weight', 0.001, 0.1)
+        emb_dims = trial.suggest_int('emb_dims', 10, 50)
+        lr = 0.001
+        batch_size = 128
 
         def _on_epoch_end(epoch, logs=None):
             """Call for pruning when end epoch.
@@ -172,7 +198,7 @@ def train(use_preprocessdata=True):
             print('Eval Metrics:', evals)
 
         set_seed()
-        model = ScoreRanker(hidden_dims, drop_rate)
+        model = ScoreRanker(hidden_dims, drop_rate, l1_weight, l2_weight, emb_dims)
         model.compile(
             tf.keras.optimizers.Adam(lr),
             loss='categorical_crossentropy',
@@ -201,7 +227,7 @@ def train(use_preprocessdata=True):
         study_name='gap-conf-kaggle',
         pruner=optuna.pruners.MedianPruner(),
         sampler=optuna.samplers.TPESampler(seed=SEED))
-    study.optimize(objective, n_trials=100, n_jobs=1)
+    study.optimize(objective, n_trials=20, n_jobs=1)
     print("Best Params", study.best_params)
     print("Best Validation Value", study.best_value)
 
