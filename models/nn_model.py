@@ -12,7 +12,7 @@ from models import stanfordnlp_model
 
 POS_WITH_POSITION_SIZE = len(stanfordnlp_model.cv_position.vocabulary_)
 POS_WITH_DEP_SIZE = len(stanfordnlp_model.cv_dependencies.vocabulary_)
-BERT_VECTOR_SIZE = 768 * 2
+BERT_VECTOR_SIZE = 768 * bert_estimator.LAYER_SIZE
 SEED = 1
 
 
