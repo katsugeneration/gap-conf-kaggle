@@ -6,7 +6,6 @@ import pandas
 import numpy as np
 import tensorflow as tf
 import bert_estimator
-import gpt2_estimator
 from models import stanfordnlp_model
 
 
@@ -71,6 +70,7 @@ class ScoreRanker(tf.keras.Model):
                  **kwargs):
         super(ScoreRanker, self).__init__()
         self.drop_rate = drop_rate
+        self.hidden_dims = hidden_dims
         self.bert_embedings = tf.keras.layers.Dense(
             hidden_dims,
             use_bias=True,
@@ -83,8 +83,13 @@ class ScoreRanker(tf.keras.Model):
             emb_dims,
             use_bias=True,
             kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
+        self.attention = tf.keras.layers.Dense(
+            emb_dims,
+            use_bias=True,
+            kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
         self.dropout = tf.keras.layers.Dropout(self.drop_rate)
-        self.out = tf.keras.layers.Dense(1,
+        self.out = tf.keras.layers.Dense(
+            1,
             kernel_regularizer=tf.keras.regularizers.l1_l2(l1=l1_weight, l2=l2_weight))
 
     def call(self, inputs):
@@ -103,22 +108,39 @@ class ScoreRanker(tf.keras.Model):
         dep_a = inputs[:, start_dep + POS_WITH_DEP_SIZE:start_dep + POS_WITH_DEP_SIZE * 2]
         dep_b = inputs[:, start_dep + POS_WITH_DEP_SIZE * 2:start_dep + POS_WITH_DEP_SIZE * 3]
 
-        pa = tf.concat([bert_p, bert_a, bert_p * bert_a], -1)
-        pb = tf.concat([bert_p, bert_b, bert_p * bert_b], -1)
-
-        pa = self.bert_embedings(pa)
+        pa = self.bert_embedings(tf.concat([bert_p, bert_a, bert_p * bert_a], -1))
         pos_pa = self.pos_embedings(tf.concat([pos_p, pos_a, pos_p * pos_a], -1))
         dep_pa = self.dep_embedings(tf.concat([dep_p, dep_a, dep_p * dep_a], -1))
-        pa = tf.nn.relu(tf.concat([pa, pos_pa, dep_pa], -1))
-        pa = self.dropout(pa)
-        pa_score = self.out(pa)
-
-        pb = self.bert_embedings(pb)
+        pb = self.bert_embedings(tf.concat([bert_p, bert_b, bert_p * bert_b], -1))
         pos_pb = self.pos_embedings(tf.concat([pos_p, pos_b, pos_p * pos_b], -1))
         dep_pb = self.dep_embedings(tf.concat([dep_p, dep_b, dep_p * dep_b], -1))
-        pb = tf.nn.relu(tf.concat([pb, pos_pb, dep_pb], -1))
-        pb = self.dropout(pb)
-        pb_score = self.out(pb)
+
+        def make_attention(p, pos, dep):
+            # Shape [B, 1, emb_dims]
+            a_p = self.attention(tf.expand_dims(p, 1))
+
+            # Shape [B, 2, emb_dims]
+            depos = tf.concat([
+                tf.expand_dims(pos, 1),
+                tf.expand_dims(dep, 1)], 1)
+
+            # Shape [B, 1, 2]
+            attentions = tf.matmul(a_p, tf.transpose(depos, (0, 2, 1)))
+
+            # Shape [B, 1]
+            attentions = tf.reduce_sum(attentions, axis=-1)
+
+            # Shape [B, hidden_dims]
+            attentioned_p = tf.math.multiply(attentions, p)
+            return attentioned_p
+
+        pa_s = tf.nn.relu(tf.concat([pa, pos_pa, dep_pa], -1))
+        pa_s = self.dropout(pa_s)
+        pa_score = self.out(pa_s)
+
+        pb_s = tf.nn.relu(tf.concat([pb, pos_pb, dep_pb], -1))
+        pb_s = self.dropout(pb_s)
+        pb_score = self.out(pb_s)
 
         outputs = tf.nn.softmax(tf.concat([pa_score, pb_score, tf.zeros_like(pa_score)], -1))
         return outputs
@@ -274,7 +296,6 @@ def train(use_preprocessdata=True):
 
 
 def evaluate(test_data, use_preprocessdata=True):
-    # gpt2_estimator.build()
     bert_estimator.build()
     train()
     X, Y = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')

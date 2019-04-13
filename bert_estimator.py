@@ -18,10 +18,9 @@ spec = importlib.util.spec_from_file_location("tokenization", os.path.join(gpt2_
 tokenization = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(tokenization)
 
-# BERT_PATH = "multi_cased_L-12_H-768_A-12/"
 BERT_PATH = "uncased_L-12_H-768_A-12/"
 seq_length = 512
-LAYER_SIZE = 2
+LAYER_SIZE = 4
 estimator = None
 tokenizer = None
 
