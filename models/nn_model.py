@@ -108,12 +108,12 @@ class ScoreRanker(tf.keras.Model):
         dep_a = inputs[:, start_dep + POS_WITH_DEP_SIZE:start_dep + POS_WITH_DEP_SIZE * 2]
         dep_b = inputs[:, start_dep + POS_WITH_DEP_SIZE * 2:start_dep + POS_WITH_DEP_SIZE * 3]
 
-        pa = self.bert_embedings(tf.concat([bert_p, bert_a, bert_p * bert_a], -1))
-        pos_pa = self.pos_embedings(tf.concat([pos_p, pos_a, pos_p * pos_a], -1))
-        dep_pa = self.dep_embedings(tf.concat([dep_p, dep_a, dep_p * dep_a], -1))
-        pb = self.bert_embedings(tf.concat([bert_p, bert_b, bert_p * bert_b], -1))
-        pos_pb = self.pos_embedings(tf.concat([pos_p, pos_b, pos_p * pos_b], -1))
-        dep_pb = self.dep_embedings(tf.concat([dep_p, dep_b, dep_p * dep_b], -1))
+        pa = self.bert_embedings(tf.concat([bert_a, bert_p * bert_a], -1))
+        pos_pa = self.pos_embedings(tf.concat([pos_a, pos_p * pos_a], -1))
+        dep_pa = self.dep_embedings(tf.concat([dep_a, dep_p * dep_a], -1))
+        pb = self.bert_embedings(tf.concat([bert_b, bert_p * bert_b], -1))
+        pos_pb = self.pos_embedings(tf.concat([pos_b, pos_p * pos_b], -1))
+        dep_pb = self.dep_embedings(tf.concat([dep_b, dep_p * dep_b], -1))
 
         def make_attention(p, pos, dep):
             # Shape [B, 1, emb_dims]
