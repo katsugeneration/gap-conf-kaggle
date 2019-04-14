@@ -180,8 +180,8 @@ def _preprocess_data(df, use_preprocessdata=False, save_path=None):
     X = np.concatenate([
         X, X2, X5
     ], axis=-1)
-    Y = stanfordnlp_model._get_classify_labels(df)
-    return X, Y
+    # Y = stanfordnlp_model._get_classify_labels(df)
+    return X
 
 
 def train(use_preprocessdata=True):
@@ -297,11 +297,11 @@ def train(use_preprocessdata=True):
 
 def evaluate(test_data, use_preprocessdata=True):
     bert_estimator.build()
-    train()
-    X, Y = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
+    # train()
+    X = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
 
     set_seed()
-    with open('model.json', 'r') as f:
+    with open('model_last2.json', 'r') as f:
         params = json.load(f)
     model = ScoreRanker(**params)
     model.compile(
@@ -310,13 +310,13 @@ def evaluate(test_data, use_preprocessdata=True):
         metrics=['acc', 'categorical_crossentropy']
     )
     model.build((None, X.shape[1]))
-    model.load_weights('model.h5')
+    model.load_weights('model_last2.h5')
 
-    evals = model.evaluate(
-            X,
-            tf.keras.utils.to_categorical(Y, num_classes=3),
-            verbose=0)
-    print("Test Accuracy:", evals[1])
+    # evals = model.evaluate(
+    #         X,
+    #         tf.keras.utils.to_categorical(Y, num_classes=3),
+    #         verbose=0)
+    # print("Test Accuracy:", evals[1])
 
     predicts = model.predict(X)
     out_df = pandas.DataFrame(data=predicts, columns=['A', 'B', 'NEITHER'])
