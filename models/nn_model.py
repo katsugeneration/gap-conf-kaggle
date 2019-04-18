@@ -298,7 +298,7 @@ def train(use_preprocessdata=True):
 def evaluate(test_data, use_preprocessdata=True):
     bert_estimator.build()
     # train()
-    X = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata.pkl')
+    X = _preprocess_data(test_data, use_preprocessdata=use_preprocessdata, save_path='preprocess_testdata_stage2.pkl')
 
     set_seed()
     with open('model_last2.json', 'r') as f:
